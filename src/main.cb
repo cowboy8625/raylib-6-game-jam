@@ -31,8 +31,89 @@ type GameState struct {
     ball: Ball,
     platform: Platform,
     bg: Color,
-    bricks: [4; [4; bool]],
-    brick_color: Color,
+    bricks: Bricks,
+    is_paused: bool = true,
+    is_start: bool = true,
+}
+
+type Bricks struct {
+    alive: [4; [4; bool]],
+    color: [4; [4; Color]],
+    x: s32,
+    y: s32,
+
+    space: usize = 64,
+    brick_size: s32 = 32,
+    brick_len_x: usize = 4,
+    brick_len_y: usize = 4,
+}
+
+fn Bricks_new(screen_width: s32, screen_height: s32) Bricks {
+    let brick_len_x: s32 = 4;
+    let brick_len_y: s32 = 4;
+    let space: s32 = 64;
+    let offset_x: s32 = screen_width / 2 - (brick_len_x * space) / 2;
+    let offset_y: s32 = screen_height / 2 - (brick_len_y * space) / 2;
+    let red = Color {.r=255,.b=0,.g=0,.a=255};
+    let blue = Color {.r=0,.b=255,.g=0,.a=255};
+    return Bricks {
+        .x = offset_x,
+        .y = offset_y,
+        .alive = [
+            [true, true, true, true],
+            [true, true, true, true],
+            [true, true, true, true],
+            [true, true, true, true],
+        ],
+        .color = [
+            [red, red, red, red],
+            [blue, blue, blue, blue],
+            [red, blue, red, red],
+            [red, red, red, red],
+        ],
+    };
+}
+
+fn Bricks_draw(self: *Bricks, gs: *GameState) void {
+    let mut y: usize = 0;
+    while y < self.brick_len_y {
+        let brick_y = ((y * self.space) as s32) + self.y;
+        let mut x: usize = 0;
+        while x < self.brick_len_x {
+            let brick_x = ((x * self.space) as s32) + self.x;
+            let alive: bool = self.alive[y][x];
+            if alive {
+                draw_rectangle(brick_x, brick_y, self.brick_size, self.brick_size, self.color[y][x]);
+            }
+            x = x + 1;
+        }
+        y = y + 1;
+    }
+}
+
+fn Bricks_update(self: *Bricks, gs: *GameState) void {
+    let mut y: usize = 0;
+    while y < self.brick_len_y {
+        let brick_y = ((y * self.space) as s32) + self.y;
+        let mut x: usize = 0;
+        while x < self.brick_len_x {
+            let brick_x = ((x * self.space) as s32) + self.x;
+            if self.alive[y][x] {
+                if gs.ball.x < brick_x + self.brick_size {
+                    if gs.ball.x + gs.ball.t.width > brick_x {
+                        if gs.ball.y < brick_y + self.brick_size {
+                            if gs.ball.y + gs.ball.t.height > brick_y {
+                                self.alive[y][x] = false;
+                                gs.ball.dy = 0 - gs.ball.dy;
+                            }
+                        }
+                    }
+                }
+            }
+            x = x + 1;
+        }
+        y = y + 1;
+    }
 }
 
 type Platform struct {
@@ -81,6 +162,12 @@ type Ball struct {
 }
 
 fn Ball_update(self: *Ball, gs: *GameState) void {
+    if gs.is_paused {
+        if gs.is_start {
+            self.x = gs.platform.x + gs.platform.w / 2 - self.t.width / 2;
+        }
+        return;
+    }
     self.x = self.x + self.dx;
     self.y = self.y + self.dy;
 
@@ -127,8 +214,8 @@ pub fn main() void {
         .screen_height = 720,
 
         .ball = Ball {
-            .x = 32,
-            .y = 32,
+            .x = screen_width / 2 - 16,
+            .y = screen_height - (screen_height / 10 - 16) - 32,
             .dx = 4,
             .dy = 3,
             .t = load_texture(&"./assets/ball.png\0"),
@@ -141,7 +228,7 @@ pub fn main() void {
         },
 
         .platform = Platform {
-            .x = screen_width / 2 - 16,
+            .x = screen_width / 2 - (128 / 2),
             .y = screen_height - (screen_height / 10 - 16),
             .w = 128,
             .h = 16,
@@ -161,46 +248,25 @@ pub fn main() void {
             .a = 0xFF,
         },
 
-        .bricks = [
-            [false, true, true, true],
-            [false, false, false, false],
-            [true, false, true, true],
-            [true, true, true, true],
-        ],
-        .brick_color = Color { .r = 255, .g = 0, .b = 0, .a = 255 },
+        .bricks = Bricks_new(screen_width, screen_height),
     };
-
-    let space: usize = 64;
-    let brick_size: s32 = 32;
-    let brick_len_x: usize = 4;
-    let brick_len_y: usize = 4;
-    let offset_x: usize = (screen_width as usize) / 2 - (brick_len_x * space) / 3;
-    let offset_y: usize = (screen_height as usize) / 2 - (brick_len_y * space) / 3;
 
     while !window_should_close() {
         Ball_update(&gs.ball, &gs);
         Platform_update(&gs.platform, &gs);
+        Bricks_update(&gs.bricks, &gs);
+
+        if gs.is_paused and gs.is_start and is_mouse_button_pressed(MouseButton::left) {
+            gs.is_paused = false;
+            gs.is_start = false;
+        }
 
         begin_drawing();
         clear_background(gs.bg);
 
         Ball_draw(&gs.ball);
         Platform_draw(&gs.platform);
-
-        let mut y: usize = 0;
-        while y < 4 {
-            let brick_y = ((y * space) + offset_y) as s32;
-            let mut x: usize = 0;
-            while x < 4 {
-                let brick_x = ((x * space) + offset_x) as s32;
-                let alive: bool = gs.bricks[y][x];
-                if alive {
-                    draw_rectangle(brick_x, brick_y, brick_size, brick_size, gs.brick_color);
-                }
-                x = x + 1;
-            }
-            y = y + 1;
-        }
+        Bricks_draw(&gs.bricks, &gs);
 
         end_drawing();
     }
