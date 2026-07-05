@@ -1,0 +1,210 @@
+// ********************************************************************************************
+// *
+// *   raylib gamejam
+// *
+// *   Code licensed under an unmodified zlib/libpng license, which is an OSI-certified,
+// *   BSD-like license that allows static linking with closed source software
+// *
+// *   Copyright (c) 2026 cowboy8625
+// *
+// *   This is just an attempt at making something for the game jam using c-flat compiler.
+// *   Anything sumbitted will be consider a win.
+// *   While the game jam is going I will stop work on the compiler in attempt to create
+// *   a game for this jam. Meanwhile I will be collecting all bugs found while developing
+// *   this game.
+// ********************************************************************************************
+
+use std::raylib;
+
+type Direction enum {
+    // Language is missing a null so none is out off state
+    none,
+    left,
+    right,
+    up,
+    down,
+}
+
+type GameState struct {
+    screen_width: s32,
+    screen_height: s32,
+    ball: Ball,
+    platform: Platform,
+    bg: Color,
+    bricks: [4; [4; bool]],
+    brick_color: Color,
+}
+
+type Platform struct {
+    x: s32,
+    y: s32,
+    w: s32,
+    h: s32,
+    c: Color,
+    dx: s32,
+}
+
+fn Platform_update(self: *Platform, gs: *GameState) void {
+    self.dx = 0;
+
+    if is_key_down(KeyboardKey::a) {
+        self.dx = self.dx - 10;
+    }
+
+    if is_key_down(KeyboardKey::d) {
+        self.dx = self.dx + 10;
+    }
+
+    self.x = self.x + self.dx;
+
+    // Clamp to screen
+    if self.x < 0 {
+        self.x = 0;
+    }
+
+    if self.x > gs.screen_width - self.w {
+        self.x = gs.screen_width - self.w;
+    }
+}
+
+fn Platform_draw(self: *Platform) void {
+    draw_rectangle(self.x, self.y, self.w, self.h, self.c);
+}
+
+type Ball struct {
+    x: s32,
+    y: s32,
+    dx: s32,
+    dy: s32,
+    t: Texture2D,
+    c: Color,
+}
+
+fn Ball_update(self: *Ball, gs: *GameState) void {
+    self.x = self.x + self.dx;
+    self.y = self.y + self.dy;
+
+    if self.x < 0 {
+        self.dx = 0 - self.dx;
+    }
+    if self.x > gs.screen_width - self.t.width {
+        self.dx = 0 - self.dx;
+    }
+    if self.y < 0 {
+        self.dy = 0 - self.dy;
+    }
+    if self.y > gs.screen_height - self.t.height {
+        self.dy = 0 - self.dy;
+    }
+
+    if self.x < gs.platform.x + gs.platform.w {
+        if self.x + self.t.width > gs.platform.x {
+            if self.y < gs.platform.y + gs.platform.h {
+                if self.y + self.t.height > gs.platform.y {
+
+                    self.y = gs.platform.y - self.t.height;
+
+                    self.dy = 0 - self.dy;
+                }
+            }
+        }
+    }
+}
+
+fn Ball_draw(self: *Ball) void {
+    draw_texture(self.t, self.x, self.y, self.c);
+}
+
+pub fn main() void {
+    let screen_width = 720;
+    let screen_height = 720;
+    init_window(screen_width, screen_height, &"c-flat raylib game jam entry attempt\0");
+    set_target_fps(60);
+    let cell_size: s32 = 32;
+
+    let gs = GameState {
+        .screen_width = 720,
+        .screen_height = 720,
+
+        .ball = Ball {
+            .x = 32,
+            .y = 32,
+            .dx = 4,
+            .dy = 3,
+            .t = load_texture(&"./assets/ball.png\0"),
+            .c = Color {
+                .r = 230,
+                .g = 80,
+                .b = 60,
+                .a = 255,
+            },
+        },
+
+        .platform = Platform {
+            .x = screen_width / 2 - 16,
+            .y = screen_height - (screen_height / 10 - 16),
+            .w = 128,
+            .h = 16,
+            .c = Color {
+                .r = 0,
+                .g = 128,
+                .b = 128,
+                .a = 255,
+            },
+            .dx = 0,
+        },
+
+        .bg = Color {
+            .r = 0x14,
+            .g = 0x14,
+            .b = 0x1E,
+            .a = 0xFF,
+        },
+
+        .bricks = [
+            [false, true, true, true],
+            [false, false, false, false],
+            [true, false, true, true],
+            [true, true, true, true],
+        ],
+        .brick_color = Color { .r = 255, .g = 0, .b = 0, .a = 255 },
+    };
+
+    let space: usize = 64;
+    let brick_size: s32 = 32;
+    let brick_len_x: usize = 4;
+    let brick_len_y: usize = 4;
+    let offset_x: usize = (screen_width as usize) / 2 - (brick_len_x * space) / 3;
+    let offset_y: usize = (screen_height as usize) / 2 - (brick_len_y * space) / 3;
+
+    while !window_should_close() {
+        Ball_update(&gs.ball, &gs);
+        Platform_update(&gs.platform, &gs);
+
+        begin_drawing();
+        clear_background(gs.bg);
+
+        Ball_draw(&gs.ball);
+        Platform_draw(&gs.platform);
+
+        let mut y: usize = 0;
+        while y < 4 {
+            let brick_y = ((y * space) + offset_y) as s32;
+            let mut x: usize = 0;
+            while x < 4 {
+                let brick_x = ((x * space) + offset_x) as s32;
+                let alive: bool = gs.bricks[y][x];
+                if alive {
+                    draw_rectangle(brick_x, brick_y, brick_size, brick_size, gs.brick_color);
+                }
+                x = x + 1;
+            }
+            y = y + 1;
+        }
+
+        end_drawing();
+    }
+
+    unload_texture(gs.ball.t);
+    close_window();
+}
