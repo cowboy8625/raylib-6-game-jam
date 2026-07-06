@@ -65,6 +65,9 @@ if [[ $local_exe -eq 1 ]]; then
   export CFLAT_STD_PATH="${CFLAT_STD_PATH:-$ROOT/std}"
 else
   CFLAT="${CFLAT:-cflat}"
+  # helpful for debugging compiler
+  # run with RUST_BACKTRACE=1 enabled
+  # CFLAT="${CFLAT:-/home/cowboy/Documents/Repos/c-flat-lang/c-flat/target/debug/cflat}"
 fi
 
 command -v wasm-opt >/dev/null 2>&1 || {

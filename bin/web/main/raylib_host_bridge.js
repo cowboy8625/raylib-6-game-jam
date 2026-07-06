@@ -126,7 +126,8 @@ export function makeRaylibHost(getCflatExports, canvas) {
         module._cf_draw_text(p, x, y, fontSize, r, g, b, a),
       );
     },
-
+    MeasureText: (textPtr, size) => 
+      withHostStr(readCStr(textPtr), (p) => module._MeasureText(p, size)),
     IsKeyPressed: (key) => module._IsKeyPressed(key),
     IsKeyDown: (key) => module._IsKeyDown(key),
     IsKeyUp: (key) => module._IsKeyUp(key),
@@ -134,6 +135,8 @@ export function makeRaylibHost(getCflatExports, canvas) {
     IsMouseButtonDown: (mouse) => module._IsMouseButtonDown(mouse),
     IsMouseButtonReleased: (mouse) => module._IsMouseButtonReleased(mouse),
     IsMouseButtonUp: (mouse) => module._IsMouseButtonUp(mouse),
+    GetMouseX: () => module._GetMouseX(),
+    GetMouseY: () => module._GetMouseY(),
     IsGamepadButtonPressed: (pad, btn) =>
       module._IsGamepadButtonPressed(pad, btn),
     GetFrameTime: () => module._GetFrameTime(),
