@@ -23,13 +23,6 @@
         border: 1px solid #333;
         background: #000;
       }
-      #container {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 12px;
-        padding: 24px;
-      }
       #log {
         width: 640px;
         min-height: 1.5em;
@@ -37,49 +30,48 @@
         font-family: monospace;
         color: #9ecbff;
       }
-      #log:empty {
-        display: none;
-      }
       .err {
         color: #ff6b6b;
+      }
+      #start {
+        padding: 10px 22px;
+        font: inherit;
+        font-weight: 600;
+        color: #14141e;
+        background: #9ecbff;
+        border: 0;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #start:disabled {
+        opacity: 0.5;
+        cursor: default;
       }
     </style>
   </head>
   <body>
     <h1>c-flat · real raylib · wasm</h1>
-    <div id="container">
-      <canvas
-        id="canvas"
-        width="640"
-        height="480"
-        oncontextmenu="event.preventDefault()"
-        tabindex="-1"
-      ></canvas>
-      <div id="log"></div>
-    </div>
+    <canvas
+      id="canvas"
+      width="640"
+      height="480"
+      oncontextmenu="event.preventDefault()"
+      tabindex="-1"
+    ></canvas>
+    <button id="start" disabled>Loading…</button>
+    <div id="log"></div>
 
     <script type="module">
       import { makeRaylibHost } from "./raylib_host_bridge.js";
 
       const WASM_URL = "./main.wasm";
       const STACK_SIZE = 0x8000;
-      const MAX_LOG_LINES = 20;
       let DATA_ADDR = 0;
-      let __cflat_lines = [""];
-      let log_line = 0;
 
       const logEl = document.getElementById("log");
       const canvas = document.getElementById("canvas");
-
-      globalThis.__cflat_log = (s) => {
-        const chunks = s.split("\n");
-        __cflat_lines[__cflat_lines.length - 1] += chunks[0];
-        for (let i = 1; i < chunks.length; i++) {
-          __cflat_lines.push(chunks[i]);
-        }
-        const numbered = __cflat_lines.map((line, i) => `${i}: ${line}`);
-        logEl.textContent = numbered.slice(-MAX_LOG_LINES).join("\n");
-      };
+      const startBtn = document.getElementById("start");
+      globalThis.__cflat_log = (s) => (logEl.textContent += s);
       const fail = (msg) => {
         logEl.innerHTML += `<span class="err">${msg}</span>\n`;
         console.error(msg);
@@ -163,11 +155,21 @@
           return fail("Failed to preload assets: " + e);
         }
 
-        try {
-          run();
-        } catch (e) {
-          fail("Trap while running main(): " + e);
-        }
+        startBtn.textContent = "▶ Start";
+        startBtn.disabled = false;
+        startBtn.addEventListener(
+          "click",
+          () => {
+            startBtn.remove();
+            canvas.focus();
+            try {
+              run();
+            } catch (e) {
+              fail("Trap while running main(): " + e);
+            }
+          },
+          { once: true },
+        );
       }
 
       main();

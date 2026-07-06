@@ -32,6 +32,7 @@ type GameState struct {
     platform: Platform,
     bg: Color,
     bricks: Bricks,
+    block_break_sound: Sound,
     is_paused: bool = true,
     is_start: bool = true,
 }
@@ -103,6 +104,7 @@ fn Bricks_update(self: *Bricks, gs: *GameState) void {
                     if gs.ball.x + gs.ball.t.width > brick_x {
                         if gs.ball.y < brick_y + self.brick_size {
                             if gs.ball.y + gs.ball.t.height > brick_y {
+                                play_sound(gs.block_break_sound);
                                 self.alive[y][x] = false;
                                 gs.ball.dy = 0 - gs.ball.dy;
                             }
@@ -206,7 +208,9 @@ pub fn main() void {
     let screen_width = 720;
     let screen_height = 720;
     init_window(screen_width, screen_height, &"c-flat raylib game jam entry attempt\0");
+    init_audio_device();
     set_target_fps(60);
+
     let cell_size: s32 = 32;
 
     let gs = GameState {
@@ -249,6 +253,7 @@ pub fn main() void {
         },
 
         .bricks = Bricks_new(screen_width, screen_height),
+        .block_break_sound = load_sound("./assets/brick-collision-sound.wav\0"),
     };
 
     while !window_should_close() {
@@ -270,7 +275,8 @@ pub fn main() void {
 
         end_drawing();
     }
-
+    unload_sound(gs.block_break_sound);
     unload_texture(gs.ball.t);
+    close_audio_device();
     close_window();
 }
