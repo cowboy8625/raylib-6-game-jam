@@ -16,300 +16,10 @@
 
 use std::raylib;
 
-type Direction enum {
-    // Language is missing a null so none is out off state
-    none,
-    left,
-    right,
-    up,
-    down,
-}
-
 type GameState struct {
     screen_width: s32,
     screen_height: s32,
-    ball: Ball,
-    platform: Platform,
     bg: Color,
-    bricks: Bricks,
-    block_break_sound: Sound,
-    is_paused: bool = true,
-    is_start: bool = true,
-    is_win: bool = false,
-}
-
-type Bricks struct {
-    alive: [4; [4; bool]],
-    color: [4; [4; Color]],
-    x: s32,
-    y: s32,
-
-    space: usize = 64,
-    brick_size: s32 = 32,
-    brick_len_x: usize = 4,
-    brick_len_y: usize = 4,
-}
-
-fn Bricks_new(screen_width: s32, screen_height: s32) Bricks {
-    let brick_len_x: s32 = 4;
-    let brick_len_y: s32 = 4;
-    let space: s32 = 64;
-    let brick_size: s32 = 32;
-
-    let grid_width: s32 = (brick_len_x - 1) * space + brick_size;
-    let grid_height: s32 = (brick_len_y - 1) * space + brick_size;
-
-    let offset_x: s32 = screen_width / 2 - grid_width / 2;
-    let offset_y: s32 = screen_height / 2 - grid_height / 2;
-
-    let red = Color {.r=255,.b=0,.g=0,.a=255};
-    let blue = Color {.r=0,.b=255,.g=0,.a=255};
-    return Bricks {
-        .x = offset_x,
-        .y = offset_y,
-        .alive = [
-            [true, true, true, true],
-            [true, true, true, true],
-            [true, true, true, true],
-            [true, true, true, true],
-        ],
-        .color = [
-            [red, red, red, red],
-            [blue, blue, blue, blue],
-            [red, blue, red, red],
-            [red, red, red, red],
-        ],
-    };
-}
-
-fn Bricks_draw(self: *Bricks, gs: *GameState) void {
-    let mut y: usize = 0;
-    while y < self.brick_len_y {
-        let brick_y = ((y * self.space) as s32) + self.y;
-        let mut x: usize = 0;
-        while x < self.brick_len_x {
-            let brick_x = ((x * self.space) as s32) + self.x;
-            let alive: bool = self.alive[y][x];
-            if alive {
-                draw_rectangle(brick_x, brick_y, self.brick_size, self.brick_size, self.color[y][x]);
-            }
-            x = x + 1;
-        }
-        y = y + 1;
-    }
-}
-
-fn Bricks_update(self: *Bricks, gs: *GameState) void {
-    let mut hit: bool = false;
-    let mut y: usize = 0;
-    while y < self.brick_len_y {
-        let brick_y = ((y * self.space) as s32) + self.y;
-        let mut x: usize = 0;
-        while x < self.brick_len_x {
-            let brick_x = ((x * self.space) as s32) + self.x;
-            if !hit {
-                if self.alive[y][x] {
-                    let ball_left = gs.ball.x;
-                    let ball_right = gs.ball.x + gs.ball.t.width;
-                    let ball_top = gs.ball.y;
-                    let ball_bottom = gs.ball.y + gs.ball.t.height;
-                    let brick_left = brick_x;
-                    let brick_right = brick_x + self.brick_size;
-                    let brick_top = brick_y;
-                    let brick_bottom = brick_y + self.brick_size;
-
-                    if ball_right > brick_left {
-                        if ball_left < brick_right {
-                            if ball_bottom > brick_top {
-                                if ball_top < brick_bottom {
-                                    let overlap_left = ball_right - brick_left;
-                                    let overlap_right = brick_right - ball_left;
-                                    let overlap_top = ball_bottom - brick_top;
-                                    let overlap_bottom = brick_bottom - ball_top;
-
-                                    let mut min_x = overlap_left;
-                                    if overlap_right < min_x {
-                                        min_x = overlap_right;
-                                    }
-                                    let mut min_y = overlap_top;
-                                    if overlap_bottom < min_y {
-                                        min_y = overlap_bottom;
-                                    }
-
-                                    if min_x < min_y {
-                                        gs.ball.dx = 0 - gs.ball.dx;
-                                    } else {
-                                        gs.ball.dy = 0 - gs.ball.dy;
-                                    }
-
-                                    play_sound(gs.block_break_sound);
-                                    self.alive[y][x] = false;
-                                    hit = true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            x = x + 1;
-        }
-        y = y + 1;
-    }
-}
-
-type Platform struct {
-    x: s32,
-    y: s32,
-    w: s32,
-    h: s32,
-    c: Color,
-    dx: s32,
-}
-
-fn Platform_update(self: *Platform, gs: *GameState) void {
-    if gs.is_paused and !gs.is_start {
-        return;
-    }
-
-    self.dx = 0;
-
-    self.x = get_mouse_x();
-
-    // Clamp to screen
-    if self.x < 0 {
-        self.x = 0;
-    }
-
-    if self.x > gs.screen_width - self.w {
-        self.x = gs.screen_width - self.w;
-    }
-}
-
-fn Platform_draw(self: *Platform) void {
-    draw_rectangle(self.x, self.y, self.w, self.h, self.c);
-}
-
-type Ball struct {
-    x: s32,
-    y: s32,
-    dx: s32,
-    dy: s32,
-    t: Texture2D,
-    c: Color,
-}
-
-fn Ball_update(self: *Ball, gs: *GameState) void {
-    if gs.is_paused {
-        if gs.is_start {
-            self.x = gs.platform.x + gs.platform.w / 2 - self.t.width / 2;
-        }
-        return;
-    }
-    self.x = self.x + self.dx;
-    self.y = self.y + self.dy;
-
-    if self.x < 0 {
-        self.dx = 0 - self.dx;
-    }
-    if self.x > gs.screen_width - self.t.width {
-        self.dx = 0 - self.dx;
-    }
-    if self.y < 0 {
-        self.dy = 0 - self.dy;
-    }
-    if self.y > gs.screen_height - self.t.height {
-        self.dy = 0 - self.dy;
-    }
-
-    if self.x < gs.platform.x + gs.platform.w {
-        if self.x + self.t.width > gs.platform.x {
-            if self.y < gs.platform.y + gs.platform.h {
-                if self.y + self.t.height > gs.platform.y {
-
-                    self.y = gs.platform.y - self.t.height;
-
-                    self.dy = 0 - self.dy;
-                }
-            }
-        }
-    }
-}
-
-fn Ball_draw(self: *Ball) void {
-    draw_texture(self.t, self.x, self.y, self.c);
-}
-
-fn draw_pause(gs: *GameState) void {
-    let color_white: Color = Color { .r = 255, .g = 255, .b = 255, .a = 255 };
-    let text = "Paused\0"
-    let size: s32 = 40;
-    let text_width = measure_text(&text, size);
-    let screen_center_x = gs.screen_width / 2 - (text_width / 2);
-    let screen_center_y = gs.screen_height / 2 - 20;
-    draw_text(&text, screen_center_x, screen_center_y, size, color_white)
-}
-
-fn draw_start_menu_title(gs: *GameState) void {
-    let color_white: Color = Color { .r = 255, .g = 255, .b = 255, .a = 255 };
-    let text = "Start\0"
-    let size: s32 = 40;
-    let text_width = measure_text(&text, size);
-    let screen_center_x = gs.screen_width / 2 - (text_width / 2);
-    let screen_center_y = gs.screen_height / 2 - 20;
-    draw_text(&text, screen_center_x, screen_center_y, size, color_white)
-}
-
-fn draw_start_menu_help_pause_info(gs: *GameState) void {
-    let color_white: Color = Color { .r = 255, .g = 255, .b = 255, .a = 255 };
-    let text = "To Pause press Escape\0"
-    let size: s32 = 40;
-    let text_width = measure_text(&text, size);
-    let screen_center_x = gs.screen_width / 2 - (text_width / 2);
-    let screen_center_y = gs.screen_height / 2 + 30;
-    draw_text(&text, screen_center_x, screen_center_y, size, color_white)
-}
-
-fn draw_start_menu_help_start(gs: *GameState) void {
-    let color_white: Color = Color { .r = 255, .g = 255, .b = 255, .a = 255 };
-    let text = "To Start press left mouse button\0"
-    let size: s32 = 40;
-    let text_width = measure_text(&text, size);
-    let screen_center_x = gs.screen_width / 2 - (text_width / 2);
-    let screen_center_y = gs.screen_height / 2 + 80;
-    draw_text(&text, screen_center_x, screen_center_y, size, color_white)
-}
-
-fn draw_start_menu(gs: *GameState) void {
-    draw_start_menu_title(gs);
-    draw_start_menu_help_pause_info(gs);
-    draw_start_menu_help_start(gs);
-}
-
-fn draw_win(gs: *GameState) void {
-    let color_white: Color = Color { .r = 255, .g = 255, .b = 255, .a = 255 };
-    let text = "You Won!\0"
-    let size: s32 = 40;
-    let text_width = measure_text(&text, size);
-    let screen_center_x = gs.screen_width / 2 - (text_width / 2);
-    let screen_center_y = gs.screen_height / 2 - 20;
-    draw_text(&text, screen_center_x, screen_center_y, size, color_white)
-}
-
-fn check_for_win(gs: *GameState) void {
-    let y: usize = 0;
-    while y < gs.bricks.alive.len {
-        let x: usize = 0;
-        let row = gs.bricks.alive[y];
-        while x < row.len {
-            if row[x] {
-                return;
-            }
-            x = x + 1;
-        }
-        y = y + 1;
-    }
-    gs.is_win = true;
-    gs.is_paused = true;
 }
 
 pub fn main() void {
@@ -317,91 +27,36 @@ pub fn main() void {
     let screen_height = 720;
 
     init_window(screen_width, screen_height, &"c-flat raylib game jam entry attempt\0");
-    init_audio_device();
     set_target_fps(60);
 
-    let cell_size: s32 = 32;
+    let color_white = Color {.r=255, .g=255, .b=255, .a=255};
+    let text = "LETS GO!!!!!!!!!!!!\0";
+    let text_size = 40;
+    let text_width = measure_text(&text, text_size);
+    let cx = screen_width  / 2 - (text_width / 2);
+    let cy = screen_height / 2 - text_size;
 
     let gs = GameState {
-        .screen_width = 720,
-        .screen_height = 720,
-
-        .ball = Ball {
-            .x = screen_width / 2 - 16,
-            .y = screen_height - (screen_height / 10 - 16) - 32,
-            .dx = 4,
-            .dy = 3,
-            .t = load_texture(&"./assets/ball.png\0"),
-            .c = Color {
-                .r = 230,
-                .g = 80,
-                .b = 60,
-                .a = 255,
-            },
-        },
-
-        .platform = Platform {
-            .x = screen_width / 2 - (128 / 2),
-            .y = screen_height - (screen_height / 10 - 16),
-            .w = 128,
-            .h = 16,
-            .c = Color {
-                .r = 0,
-                .g = 128,
-                .b = 128,
-                .a = 255,
-            },
-            .dx = 0,
-        },
-
+        .screen_width = screen_width,
+        .screen_height = screen_height,
         .bg = Color {
             .r = 0x14,
             .g = 0x14,
             .b = 0x1E,
             .a = 0xFF,
         },
-
-        .bricks = Bricks_new(screen_width, screen_height),
-        .block_break_sound = load_sound("./assets/brick-collision-sound.wav\0"),
     };
 
     while !window_should_close() {
-        Ball_update(&gs.ball, &gs);
-        Platform_update(&gs.platform, &gs);
-        Bricks_update(&gs.bricks, &gs);
-
-        if gs.is_paused and gs.is_start and is_mouse_button_pressed(MouseButton::left) {
-            gs.is_paused = false;
-            gs.is_start = false;
-        }
-
-        if is_key_pressed(KeyboardKey::escape) {
-            gs.is_paused = !gs.is_paused;
-        }
-
-        check_for_win(&gs);
+        // UPDATE
 
         begin_drawing();
         clear_background(gs.bg);
 
-        Ball_draw(&gs.ball);
-        Platform_draw(&gs.platform);
-        Bricks_draw(&gs.bricks, &gs);
-
-        if gs.is_paused and !gs.is_start and !gs.is_win {
-            draw_pause(&gs);
-        }
-        if gs.is_paused and gs.is_start {
-            draw_start_menu(&gs);
-        }
-        if gs.is_win {
-            draw_win(&gs);
-        }
+        // DARW
+        draw_text(&text, cx, cy, text_size, color_white)
 
         end_drawing();
     }
-    unload_sound(gs.block_break_sound);
-    unload_texture(gs.ball.t);
-    close_audio_device();
     close_window();
 }
