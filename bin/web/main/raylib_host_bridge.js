@@ -34,7 +34,6 @@ export function makeRaylibHost(getCflatExports, canvas) {
     return p;
   };
 
-  // Read a Texture2D (id:u32, width,height,mipmaps,format:i32) from c-flat memory.
   const readTexture = (ptr) => {
     const d = cfDV();
     return [
@@ -50,6 +49,7 @@ export function makeRaylibHost(getCflatExports, canvas) {
     const m = cfU8();
     return [m[ptr], m[ptr + 1], m[ptr + 2], m[ptr + 3]];
   };
+
   const readRect = (ptr) => {
     const d = cfDV();
     return [
@@ -59,6 +59,16 @@ export function makeRaylibHost(getCflatExports, canvas) {
       d.getFloat32(ptr + 12, true),
     ];
   };
+
+  const readVector2 = (ptr) => {
+    const buf = cfMem().buffer;
+    if (ptr < 0 || ptr + 8 > buf.byteLength) {
+      console.error("BAD Vector2 ptr:", ptr, "buffer size:", buf.byteLength);
+    }
+    const d = cfDV();
+    return [d.getFloat32(ptr, true), d.getFloat32(ptr + 4, true)];
+  };
+
   const readCStr = (ptr) => {
     const m = cfU8();
     let end = ptr;
@@ -126,7 +136,42 @@ export function makeRaylibHost(getCflatExports, canvas) {
         module._cf_draw_text(p, x, y, fontSize, r, g, b, a),
       );
     },
-    MeasureText: (textPtr, size) => 
+
+    DrawPoly: (vector2Ptr, side, radius, rotation, colorPtr) => {
+      const [x, y] = readVector2(vector2Ptr);
+      const [r, g, b, a] = readColor(colorPtr);
+      module._cf_draw_poly(x, y, side, radius, rotation, r, g, b, a);
+    },
+    DrawPolyLines: (vector2Ptr, side, radius, rotation, colorPtr) => {
+      const [x, y] = readVector2(vector2Ptr);
+      const [r, g, b, a] = readColor(colorPtr);
+      module._cf_draw_poly_lines(x, y, side, radius, rotation, r, g, b, a);
+    },
+    DrawPolyLinesEx: (
+      vector2Ptr,
+      side,
+      radius,
+      rotation,
+      lineThick,
+      colorPtr,
+    ) => {
+      const [x, y] = readVector2(vector2Ptr);
+      const [r, g, b, a] = readColor(colorPtr);
+      module._cf_draw_poly_lines_ex(
+        x,
+        y,
+        side,
+        radius,
+        rotation,
+        lineThick,
+        r,
+        g,
+        b,
+        a,
+      );
+    },
+
+    MeasureText: (textPtr, size) =>
       withHostStr(readCStr(textPtr), (p) => module._MeasureText(p, size)),
     IsKeyPressed: (key) => module._IsKeyPressed(key),
     IsKeyDown: (key) => module._IsKeyDown(key),
@@ -240,6 +285,9 @@ export function makeRaylibHost(getCflatExports, canvas) {
     WaveFormat: (wave, a, b, c) => module._WaveFormat(wave, a, b, c),
     LoadWaveSamples: (wave) => module._LoadWaveSamples(wave),
     UnloadWaveSamples: (v) => module._UnloadWaveSamples(v),
+    // Random number
+    SetRandomSeed: (seed) => module._SetRandomSeed(seed),
+    GetRandomValue: (min, max) => module._GetRandomValue(min, max),
 
     write_bool: (n) => globalThis.__cflat_log(n ? "true" : "false"),
     write_u8: (n) => globalThis.__cflat_log(String(n)),
