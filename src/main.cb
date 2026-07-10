@@ -23,12 +23,6 @@ use std::math;
 use std::fmt;
 use std::ascii;
 
-fn abs_s32(n: s32) s32 { if n < 0 { return 0 - n; } return n; }
-
-fn max_s32(a: s32, b: s32) s32 { if a > b { return a; } return b; }
-
-fn min_s32(a: s32, b: s32) s32 { if a < b { return a; } return b; }
-
 fn axial_to_index(q: s32, r: s32, radius: s32) usize {
     let mut idx: usize = 0;
     let mut rr: s32 = 0 - radius;
@@ -65,22 +59,22 @@ fn axial_neighbor(q: s32, r: s32, dir: Direction, radius: s32) HexCoord {
 
 fn axial_valid(q: s32, r: s32, radius: s32) bool {
     let s: s32 = 0 - q - r;
-    if abs_s32(q) > radius { return false; }
-    if abs_s32(r) > radius { return false; }
-    if abs_s32(s) > radius { return false; }
+    if abs<(s32)>(q) > radius { return false; }
+    if abs<(s32)>(r) > radius { return false; }
+    if abs<(s32)>(s) > radius { return false; }
     return true;
 }
 
 fn row_len(r: s32, radius: s32) s32 {
-    return (2 * radius + 1) - abs_s32(r);
+    return (2 * radius + 1) - abs<(s32)>(r);
 }
 
 fn q_min_for_row(r: s32, radius: s32) s32 {
-    return max_s32(0 - radius, 0 - r - radius);
+    return max<(s32)>(0 - radius, 0 - r - radius);
 }
 
 fn q_max_for_row(r: s32, radius: s32) s32 {
-    return min_s32(radius, radius - r);
+    return min<(s32)>(radius, radius - r);
 }
 
 fn axial_to_pixel(q: s32, r: s32, size: f32) Vector2 {
@@ -179,32 +173,16 @@ type Board struct {
     radius: s32 = 2,
     hex_size: f32 = 60.0,
     ready: bool = true,
+    move_delay: f32 = 0.25,
+    move_cooldown: f32 = 0.0,
 }
 
 fn Board_new(screen_width: s32, screen_height: s32) Board {
-    let mut b = Board {
+    let b = Board {
         .offset_x = screen_width / 2,
         .offset_y = screen_height / 2,
         .tiles = [HexTile{}; 19],
     };
-
-    let radius = b.radius;
-    let mut r: s32 = 0 - radius;
-    while r <= radius {
-        let qmin = q_min_for_row(r, radius);
-        let qmax = q_max_for_row(r, radius);
-        let mut q: s32 = qmin;
-        while q <= qmax {
-            let idx = axial_to_index(q, r, radius);
-            let is_alive = get_random_value(0, 1);
-            if is_alive == 1 {
-                b.tiles[idx].exists = true;
-                b.tiles[idx].value = 1;
-            }
-            q = q + 1;
-        }
-        r = r + 1;
-    }
     return b;
 }
 
@@ -344,6 +322,66 @@ fn Board_move(self: *Board, dir: Direction) void {
     self.ready = true;
 }
 
+fn negate(value: f32) f32 {
+    let neg_one: f32 = 0.0 - 1.0;
+    return value * neg_one;
+}
+
+fn Board_draw_direction_labels(self: *Board) void {
+    let white = Color {.r=255,.g=255,.b=255,.a=255};
+    let outer_size: f32 = self.hex_size * ((2.0 * (self.radius as f32)) + 1.0);
+    let apothem: f32 = outer_size * 0.8660254;
+    let label_distance: f32 = apothem + 24.0;
+    let cx: f32 = self.offset_x as f32;
+    let cy: f32 = self.offset_y as f32;
+    let text_size: s32 = 24;
+
+    // W = up
+    draw_key_label(cx, cy, negate(90.0), label_distance, &"W\0", text_size, white);
+    // E = up_right
+    draw_key_label(cx, cy, negate(30.0), label_distance, &"E\0", text_size, white);
+    // D = down_right
+    draw_key_label(cx, cy, 30.0, label_distance, &"D\0", text_size, white);
+    // S = down
+    draw_key_label(cx, cy, 90.0, label_distance, &"S\0", text_size, white);
+    // A = down_left
+    draw_key_label(cx, cy, 150.0, label_distance, &"A\0", text_size, white);
+    // Q = up_left
+    draw_key_label(cx, cy, 210.0, label_distance, &"Q\0", text_size, white);
+}
+
+fn draw_key_label(cx: f32, cy: f32, angle_deg: f32, distance: f32, text: *[u8], text_size: s32, color: Color) void {
+    let angle_rad: f32 = angle_deg * 0.017453292;
+    let x: f32 = cx + distance * math::cos(angle_rad);
+    let y: f32 = cy + distance * math::sin(angle_rad);
+    let text_width = measure_text(text, text_size);
+    draw_text(text.data, (x as s32) - text_width / 2, (y as s32) - text_size / 2, text_size, color);
+}
+
+fn Board_draw_grid(self: *Board) void {
+    let grid_color = Color {.r=60,.g=60,.b=65,.a=255};
+    let grid_color_2 = Color {.r=20,.g=20,.b=30,.a=255};
+    let radius = self.radius;
+
+    let mut r: s32 = 0 - radius;
+    while r <= radius {
+        let qmin = q_min_for_row(r, radius);
+        let qmax = q_max_for_row(r, radius);
+        let mut q: s32 = qmin;
+        while q <= qmax {
+            let pixel = axial_to_pixel(q, r, self.hex_size);
+            let center = Vector2 {
+                .x = pixel.x + (self.offset_x as f32),
+                .y = pixel.y + (self.offset_y as f32),
+            };
+            draw_poly(center, 6, self.hex_size, 0.0, grid_color_2);
+            draw_poly_lines_ex(center, 6, self.hex_size, 0.0, 1.0, grid_color);
+            q = q + 1;
+        }
+        r = r + 1;
+    }
+}
+
 fn Board_draw_outline(self: *Board) void {
     let inner_color = Color {.r=0x18,.g=0x18,.b=0x1A,.a=0xFF};
     let outer_color = Color {.r=0x20,.g=0x20,.b=0x1B,.a=0xFF};
@@ -357,7 +395,6 @@ fn Board_draw_outline(self: *Board) void {
 }
 
 fn Board_draw(self: *Board, gs: *GameState) void {
-    Board_draw_outline(self)
 
     let white = Color {.r=255,.g=255,.b=255,.a=255};
     let radius = self.radius;
@@ -407,23 +444,32 @@ pub fn main() void {
     };
 
     while !window_should_close() {
+        let dt = get_frame_time();
         // UPDATE
 
-        if is_key_pressed(KeyboardKey::w) {
+        if gs.board.move_cooldown > 0.0 {
+            gs.board.move_cooldown = gs.board.move_cooldown - dt;
+        } else if is_key_pressed(KeyboardKey::w) {
             Board_move(&gs.board, Direction::up);
+            gs.board.move_cooldown = gs.board.move_delay;
         } else if is_key_pressed(KeyboardKey::s) {
             Board_move(&gs.board, Direction::down);
+            gs.board.move_cooldown = gs.board.move_delay;
         } else if is_key_pressed(KeyboardKey::e) {
             Board_move(&gs.board, Direction::up_right);
+            gs.board.move_cooldown = gs.board.move_delay;
         } else if is_key_pressed(KeyboardKey::d) {
             Board_move(&gs.board, Direction::down_right);
+            gs.board.move_cooldown = gs.board.move_delay;
         } else if is_key_pressed(KeyboardKey::q) {
             Board_move(&gs.board, Direction::up_left);
+            gs.board.move_cooldown = gs.board.move_delay;
         } else if is_key_pressed(KeyboardKey::a) {
             Board_move(&gs.board, Direction::down_left);
+            gs.board.move_cooldown = gs.board.move_delay;
         }
 
-        if gs.board.ready {
+        if gs.board.ready and !(gs.board.move_cooldown > 0.0) {
             Board_spawn(&gs.board);
         }
 
@@ -431,6 +477,10 @@ pub fn main() void {
         clear_background(gs.bg);
 
         // DARW
+
+        Board_draw_outline(&gs.board);
+        Board_draw_grid(&gs.board);
+        Board_draw_direction_labels(&gs.board);
         Board_draw(&gs.board, &gs);
 
         end_drawing();

@@ -1,0 +1,6 @@
+- change color of tiles depending on the value
+- add sliding animation
+- add touch support
+- add art for tiles
+- and sounds for sliding
+- maybe some background music
