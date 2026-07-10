@@ -256,6 +256,7 @@ fn Board_spawn(self: *Board) void {
 fn Board_move(self: *Board, dir: Direction) void {
     let radius = self.radius;
     let rev = Direction_reverse(dir);
+    let mut moved: bool = false;
 
     let mut r: s32 = 0 - radius;
     while r <= radius {
@@ -333,7 +334,17 @@ fn Board_move(self: *Board, dir: Direction) void {
                 let mut w: usize = 0;
                 while w < line_len {
                     let idx = axial_to_index(line_q[w], line_r[w], radius);
-                    if w < merged_count {
+
+                    let new_exists = w < merged_count;
+                    let new_value = if new_exists { merged[w] } else { 0 as u32 };
+
+                    if !(self.tiles[idx].exists == new_exists) {
+                        moved = true;
+                    } else if new_exists and !(self.tiles[idx].value == new_value) {
+                        moved = true;
+                    }
+
+                    if new_exists {
                         self.tiles[idx] = HexTile { .value = merged[w], .exists = true };
                     } else {
                         self.tiles[idx] = HexTile {};
@@ -347,7 +358,7 @@ fn Board_move(self: *Board, dir: Direction) void {
         r = r + 1;
     }
 
-    self.ready = true;
+    self.ready = moved;
 }
 
 fn negate(value: f32) f32 {
