@@ -105,10 +105,38 @@ fn number_to_c_string(score: s32, out: *[11; u8]) void {
     }
 }
 
-fn draw_tile(center: Vector2, value: s32, size: f32, color: Color, filled: bool) void {
-    if (filled) {
-        draw_poly(center, 6, size, 0.0, color);
+fn tile_color(value: s32) Color {
+    if value == 1 {
+        return Color {.r=238,.g=228,.b=218,.a=255};
+    } else if value == 2 {
+        return Color {.r=237,.g=224,.b=200,.a=255};
+    } else if value == 4 {
+        return Color {.r=242,.g=177,.b=121,.a=255};
+    } else if value == 8 {
+        return Color {.r=245,.g=149,.b=99,.a=255};
+    } else if value == 16 {
+        return Color {.r=246,.g=124,.b=95,.a=255};
+    } else if value == 32 {
+        return Color {.r=246,.g=94,.b=59,.a=255};
+    } else if value == 64 {
+        return Color {.r=237,.g=207,.b=114,.a=255};
+    } else if value == 128 {
+        return Color {.r=237,.g=204,.b=97,.a=255};
+    } else if value == 256 {
+        return Color {.r=237,.g=200,.b=80,.a=255};
+    } else if value == 512 {
+        return Color {.r=237,.g=197,.b=63,.a=255};
+    } else if value == 1024 {
+        return Color {.r=237,.g=194,.b=46,.a=255};
+    } else if value == 2048 {
+        return Color {.r=237,.g=194,.b=46,.a=255};
+    } else {
+        return Color {.r=60,.g=58,.b=50,.a=255};
     }
+}
+
+fn draw_tile(center: Vector2, value: s32, size: f32, color: Color) void {
+    draw_poly(center, 6, size, 0.0, color);
     let black = Color {.r=0,.g=0,.b=0,.a=255};
     draw_poly_lines_ex(center, 6, size, 0.0, 2.0, black);
     let x = center.x as s32;
@@ -396,7 +424,6 @@ fn Board_draw_outline(self: *Board) void {
 
 fn Board_draw(self: *Board, gs: *GameState) void {
 
-    let white = Color {.r=255,.g=255,.b=255,.a=255};
     let radius = self.radius;
 
     let mut r: s32 = 0 - radius;
@@ -414,7 +441,8 @@ fn Board_draw(self: *Board, gs: *GameState) void {
                     .y = pixel.y + (self.offset_y as f32),
                 };
                 let value = tile.value as s32;
-                draw_tile(center, value, self.hex_size, white, true);
+                let fill_color: Color = tile_color(value);
+                draw_tile(center, value, self.hex_size, fill_color);
             }
             q = q + 1;
         }
