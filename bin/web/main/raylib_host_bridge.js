@@ -299,6 +299,7 @@ export function makeRaylibHost(getCflatExports, canvas) {
     write: (ptr, len) => {
       const s = new TextDecoder().decode(cfU8().subarray(ptr, ptr + len));
       globalThis.__cflat_log(s);
+      console.log(s);
       return 0;
     },
   };

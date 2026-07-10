@@ -23,6 +23,109 @@ use std::math;
 use std::fmt;
 use std::ascii;
 
+fn abs_s32(n: s32) s32 { if n < 0 { return 0 - n; } return n; }
+
+fn max_s32(a: s32, b: s32) s32 { if a > b { return a; } return b; }
+
+fn min_s32(a: s32, b: s32) s32 { if a < b { return a; } return b; }
+
+fn axial_to_index(q: s32, r: s32, radius: s32) usize {
+    let mut idx: usize = 0;
+    let mut rr: s32 = 0 - radius;
+    while rr < r {
+        idx = idx + (row_len(rr, radius) as usize);
+        rr = rr + 1;
+    }
+    let qmin = q_min_for_row(r, radius);
+    idx = idx + ((q - qmin) as usize);
+    return idx;
+}
+
+fn axial_neighbor(q: s32, r: s32, dir: Direction, radius: s32) HexCoord {
+    let mut nq: s32 = q;
+    let mut nr: s32 = r;
+
+    if dir == Direction::up {
+        nr = r - 1;
+    } else if dir == Direction::down {
+        nr = r + 1;
+    } else if dir == Direction::up_right {
+        nq = q + 1; nr = r - 1;
+    } else if dir == Direction::down_left {
+        nq = q - 1; nr = r + 1;
+    } else if dir == Direction::up_left {
+        nq = q - 1;
+    } else if dir == Direction::down_right {
+        nq = q + 1;
+    }
+
+    let valid = axial_valid(nq, nr, radius);
+    return HexCoord { .q = nq, .r = nr, .valid = valid };
+}
+
+fn axial_valid(q: s32, r: s32, radius: s32) bool {
+    let s: s32 = 0 - q - r;
+    if abs_s32(q) > radius { return false; }
+    if abs_s32(r) > radius { return false; }
+    if abs_s32(s) > radius { return false; }
+    return true;
+}
+
+fn row_len(r: s32, radius: s32) s32 {
+    return (2 * radius + 1) - abs_s32(r);
+}
+
+fn q_min_for_row(r: s32, radius: s32) s32 {
+    return max_s32(0 - radius, 0 - r - radius);
+}
+
+fn q_max_for_row(r: s32, radius: s32) s32 {
+    return min_s32(radius, radius - r);
+}
+
+fn axial_to_pixel(q: s32, r: s32, size: f32) Vector2 {
+    let SQRT3: f32 = 1.7320508;
+    let qf: f32 = q as f32;
+    let rf: f32 = r as f32;
+    let x = size * 1.5 * qf;
+    let y = size * SQRT3 * (rf + qf / 2.0);
+    return Vector2 { .x = x, .y = y };
+}
+
+/// places number into a \0 terminated string
+fn number_to_c_string(score: s32, out: *[11; u8]) void {
+    let mut buffer: [11; u8] = "          \0";
+    fmt::convert_s32_to_array(score, &buffer);
+
+    let mut start: usize = 0;
+    while start < 11 and buffer[start] == 32 {
+        start = start + 1;
+    }
+
+    let mut i: usize = 0;
+    let mut idx: usize = start;
+    while idx < 11 {
+        out[i] = buffer[idx];
+        i = i + 1;
+        idx = idx + 1;
+    }
+}
+
+fn draw_tile(center: Vector2, value: s32, size: f32, color: Color, filled: bool) void {
+    if (filled) {
+        draw_poly(center, 6, size, 0.0, color);
+    }
+    let black = Color {.r=0,.g=0,.b=0,.a=255};
+    draw_poly_lines_ex(center, 6, size, 0.0, 2.0, black);
+    let x = center.x as s32;
+    let y = center.y as s32;
+    let text_size = 20;
+    let text: [11; u8] = [0;11];
+    number_to_c_string(value, &text);
+    let text_width = measure_text(&text, text_size);
+    draw_text(&text, x - text_width / 2, y - text_size / 2, text_size, black);
+}
+
 type Direction enum {
     up,
     up_right,
@@ -32,153 +135,7 @@ type Direction enum {
     down_left,
 }
 
-fn Direction_print(self: Direction) void {
-    if self == Direction::up {
-        let text_up = "up\n";
-        write(&text_up, text_up.len);
-    } else if self == Direction::up_right {
-        let text_up_right = "up_right\n";
-        write(&text_up_right, text_up_right.len);
-    } else if self == Direction::up_left {
-        let text_up_left = "up_left\n";
-        write(&text_up_left, text_up_left.len);
-    } else if self == Direction::down {
-        let text_down = "down\n";
-        write(&text_down, text_down.len);
-    } else if self == Direction::down_right {
-        let text_down_right = "down_right\n";
-        write(&text_down_right, text_down_right.len);
-    } else if self == Direction::down_left {
-        let text_down_left = "down_left\n";
-        write(&text_down_left, text_down_left.len);
-    }
-}
-
-type GameState struct {
-    screen_width: s32,
-    screen_height: s32,
-    bg: Color,
-    board: Board,
-}
-
-type HexTile struct {
-    value: u32 = 0,
-    exists: bool = false,
-}
-
-type Board struct {
-    tiles: [5; [5; HexTile]],
-    offset_x: s32,
-    offset_y: s32,
-
-    // Defaults
-    radius: s32 = 2,
-    hex_size: f32 = 60.0,
-
-    ready: bool = false,
-}
-
-fn Board_new(screen_width: s32, screen_height: s32) Board {
-    let dead = HexTile {};
-    let alive = HexTile {
-        .value = 1,
-        .exists = true,
-    };
-    let mut b = Board {
-        .offset_x = screen_width / 2,
-        .offset_y = screen_height / 2,
-        .tiles = [
-            [dead,dead,dead,dead,dead],
-            [dead,dead,dead,dead,dead],
-            [dead,dead,dead,dead,dead],
-            [dead,dead,dead,dead,dead],
-            [dead,dead,dead,alive,alive],
-        ],
-    };
-    return b;
-}
-
-type HexCoord struct {
-    row: s32,
-    col: s32,
-    valid: bool,
-}
-
-fn HexCoord_print(self: *HexCoord) void {
-    write(&"HexCoord {\n", 11);
-
-    let buffer1: [11; u8] = [0; 11];
-    let buffer2: [11; u8] = [0; 11];
-
-    write(&"row: ", 5);
-    convert_s32_to_array(self.row, &buffer1);
-    write(&buffer1, buffer1.len);
-    write(&",\n", 2);
-
-    write(&"col: ", 5);
-    convert_s32_to_array(self.col, &buffer2);
-    write(&buffer2, buffer2.len);
-    write(&",\n", 2);
-
-    write(&"valid: ", 7);
-    if self.valid {
-        write(&"true,\n", 6);
-    } else {
-        write(&"false,\n", 7);
-    }
-}
-
-fn hex_neighbor(row: s32, col: s32, dir: Direction) HexCoord {
-    let is_even: bool = (col % 2) == 0;
-    let mut nr: s32 = row;
-    let mut nc: s32 = col;
-
-    if dir == Direction::up {
-        nr = row - 1;
-        nc = col;
-    } else if dir == Direction::down {
-        nr = row + 1;
-        nc = col;
-    } else if dir == Direction::up_right {
-        nc = col + 1;
-        if is_even {
-            nr = row - 1;
-        } else {
-            nr = row;
-        }
-    } else if dir == Direction::down_right {
-        nc = col + 1;
-        if is_even {
-            nr = row;
-        } else {
-            nr = row + 1;
-        }
-    } else if dir == Direction::up_left {
-        nc = col - 1;
-        if is_even {
-            nr = row - 1;
-        } else {
-            nr = row;
-        }
-    } else if dir == Direction::down_left {
-        nc = col - 1;
-        if is_even {
-            nr = row;
-        } else {
-            nr = row + 1;
-        }
-    }
-
-    let valid: bool = (nr >= 0) and (nr < 5) and (nc >= 0) and (nc < 5);
-
-    return HexCoord {
-        .row = nr,
-        .col = nc,
-        .valid = valid
-    };
-}
-
-fn hex_reverse(dir: Direction) Direction {
+fn Direction_reverse(dir: Direction) Direction {
     if dir == Direction::up {
         return Direction::down;
     } else if dir == Direction::down {
@@ -196,80 +153,157 @@ fn hex_reverse(dir: Direction) Direction {
     }
 }
 
-fn safe_get(self: *Board, r: usize, c: usize, label: *[u8]) HexTile {
-    if r >= 5 or c >= 5 {
-        write(label.data, label.len);
-        let buf: [11; u8] = [0; 11];
-        write(&"  r=", 4);
-        convert_s32_to_array(r as s32, &buf);
-        write(&buf, 11);
-        write(&"  c=", 4);
-        buf = [0,0,0,0,0,0,0,0,0,0,0];
-        convert_s32_to_array(c as s32, &buf);
-        write(&buf, 11);
-        write(&"\n", 1);
+
+type GameState struct {
+    screen_width: s32,
+    screen_height: s32,
+    bg: Color,
+    board: Board,
+}
+
+type HexTile struct {
+    value: u32 = 0,
+    exists: bool = false,
+}
+
+type HexCoord struct {
+    q: s32,
+    r: s32,
+    valid: bool,
+}
+
+type Board struct {
+    tiles: [19; HexTile],
+    offset_x: s32,
+    offset_y: s32,
+    radius: s32 = 2,
+    hex_size: f32 = 60.0,
+    ready: bool = true,
+}
+
+fn Board_new(screen_width: s32, screen_height: s32) Board {
+    let mut b = Board {
+        .offset_x = screen_width / 2,
+        .offset_y = screen_height / 2,
+        .tiles = [HexTile{}; 19],
+    };
+
+    let radius = b.radius;
+    let mut r: s32 = 0 - radius;
+    while r <= radius {
+        let qmin = q_min_for_row(r, radius);
+        let qmax = q_max_for_row(r, radius);
+        let mut q: s32 = qmin;
+        while q <= qmax {
+            let idx = axial_to_index(q, r, radius);
+            let is_alive = get_random_value(0, 1);
+            if is_alive == 1 {
+                b.tiles[idx].exists = true;
+                b.tiles[idx].value = 1;
+            }
+            q = q + 1;
+        }
+        r = r + 1;
     }
-    return self.tiles[r][c];
+    return b;
+}
+
+fn Board_spawn(self: *Board) void {
+    let mut free_cells: [19; usize] = [0; 19];
+    let mut free_count: usize = 0;
+
+    let mut i: usize = 0;
+    while i < 19 {
+        if !self.tiles[i].exists {
+            free_cells[free_count] = i;
+            free_count = free_count + 1;
+        }
+        i = i + 1;
+    }
+
+    if free_count == 0 {
+        self.ready = false;
+        return;
+    }
+
+    let mut count = get_random_value(1, 2);
+    if (count as usize) > free_count {
+        count = free_count as s32;
+    }
+
+    while count > 0 and free_count > 0 {
+        let pick = get_random_value(0, (free_count - 1) as s32) as usize;
+        let idx = free_cells[pick];
+
+        self.tiles[idx].value = get_random_value(1, 2) as u32;
+        self.tiles[idx].exists = true;
+
+        free_count = free_count - 1;
+        free_cells[pick] = free_cells[free_count];
+
+        count = count - 1;
+    }
+
+    self.ready = false;
 }
 
 fn Board_move(self: *Board, dir: Direction) void {
-    let rev = hex_reverse(dir);
+    let radius = self.radius;
+    let rev = Direction_reverse(dir);
 
-    let mut row: usize = 0;
-    while row < 5 {
-        let mut col: usize = 0;
-        while col < 5 {
-            let pred = hex_neighbor(row as s32, col as s32, rev);
+    let mut r: s32 = 0 - radius;
+    while r <= radius {
+        let qmin = q_min_for_row(r, radius);
+        let qmax = q_max_for_row(r, radius);
+        let mut q: s32 = qmin;
+        while q <= qmax {
+            let pred = axial_neighbor(q, r, rev, radius);
 
             if !pred.valid {
-                // HexCoord_print(&pred);
-                let mut line_row: [5; usize] = [0, 0, 0, 0, 0];
-                let mut line_col: [5; usize] = [0, 0, 0, 0, 0];
+                let mut line_q: [5; s32] = [0, 0, 0, 0, 0];
+                let mut line_r: [5; s32] = [0, 0, 0, 0, 0];
                 let mut line_len: usize = 0;
 
-                let mut cur_row: s32 = row as s32;
-                let mut cur_col: s32 = col as s32;
+                let mut cur_q: s32 = q;
+                let mut cur_r: s32 = r;
                 let mut in_bounds: bool = true;
 
                 while in_bounds and line_len < 5 {
-                    line_row[line_len] = cur_row as usize;
-                    line_col[line_len] = cur_col as usize;
+                    line_q[line_len] = cur_q;
+                    line_r[line_len] = cur_r;
                     line_len = line_len + 1;
 
-                    let next = hex_neighbor(cur_row, cur_col, dir);
+                    let next = axial_neighbor(cur_q, cur_r, dir, radius);
                     if next.valid {
-                        cur_row = next.row;
-                        cur_col = next.col;
+                        cur_q = next.q;
+                        cur_r = next.r;
                     } else {
                         in_bounds = false;
                     }
                 }
 
-                // Reverse so index 0 is the wall end, destination side of this line
                 if line_len > 0 {
                     let mut lo: usize = 0;
                     let mut hi: usize = line_len - 1;
                     while lo < hi {
-                        let tmp_r = line_row[lo];
-                        let tmp_c = line_col[lo];
-                        line_row[lo] = line_row[hi];
-                        line_col[lo] = line_col[hi];
-                        line_row[hi] = tmp_r;
-                        line_col[hi] = tmp_c;
+                        let tmp_q = line_q[lo];
+                        let tmp_r = line_r[lo];
+                        line_q[lo] = line_q[hi];
+                        line_r[lo] = line_r[hi];
+                        line_q[hi] = tmp_q;
+                        line_r[hi] = tmp_r;
                         lo = lo + 1;
                         hi = hi - 1;
                     }
                 }
 
-                // Gather existing values, now correctly wall first
                 let mut values: [5; u32] = [0, 0, 0, 0, 0];
                 let mut count: usize = 0;
                 let mut i: usize = 0;
                 while i < line_len {
-                    let r = line_row[i];
-                    let c = line_col[i];
-                    if self.tiles[r][c].exists { 
-                        values[count] = self.tiles[r][c].value;
+                    let idx = axial_to_index(line_q[i], line_r[i], radius);
+                    if self.tiles[idx].exists {
+                        values[count] = self.tiles[idx].value;
                         count = count + 1;
                     }
                     i = i + 1;
@@ -292,141 +326,63 @@ fn Board_move(self: *Board, dir: Direction) void {
 
                 let mut w: usize = 0;
                 while w < line_len {
-                    let r = line_row[w];
-                    let c = line_col[w];
+                    let idx = axial_to_index(line_q[w], line_r[w], radius);
                     if w < merged_count {
-                        self.tiles[r][c] = HexTile { .value = merged[w], .exists = true };
+                        self.tiles[idx] = HexTile { .value = merged[w], .exists = true };
                     } else {
-                        self.tiles[r][c] = HexTile {};
+                        self.tiles[idx] = HexTile {};
                     }
                     w = w + 1;
                 }
             }
 
-            col = col + 1;
+            q = q + 1;
         }
-        row = row + 1;
+        r = r + 1;
     }
-    // TODO: Later this only need to be triggered if a move is valid
+
     self.ready = true;
 }
 
-fn Board_spawn(self: *Board) void {
-    let mut free_cells: [25; usize] = [0; 25];
-    let mut free_count: usize = 0;
-
-    let mut row: usize = 0;
-    while row < 5 {
-        let mut col: usize = 0;
-        while col < 5 {
-            if !self.tiles[row][col].exists {
-                free_cells[free_count] = col * 5 + row;
-                free_count = free_count + 1;
-            }
-            col = col + 1;
-        }
-        row = row + 1;
-    }
-
-    if free_count == 0 {
-        self.ready = false;
-        return;
-    }
-
-    let mut count = get_random_value(1, 2);
-    if (count as usize) > free_count {
-        count = free_count as s32;
-    }
-
-    while count > 0 and free_count > 0 {
-        let pick = get_random_value(0, (free_count - 1) as s32) as usize;
-        let index = free_cells[pick];
-        let r = index % 5;
-        let c = index / 5;
-
-        self.tiles[r][c].value = get_random_value(1, 2) as u32;
-        self.tiles[r][c].exists = true;
-
-        free_count = free_count - 1;
-        free_cells[pick] = free_cells[free_count];
-
-        count = count - 1;
-    }
-
-    self.ready = false;
+fn Board_draw_outline(self: *Board) void {
+    let inner_color = Color {.r=0x18,.g=0x18,.b=0x1A,.a=0xFF};
+    let outer_color = Color {.r=0x20,.g=0x20,.b=0x1B,.a=0xFF};
+    let center = Vector2 {
+        .x = self.offset_x as f32,
+        .y = self.offset_y as f32,
+    };
+    let outline_size: f32 = self.hex_size * ((2.0 * (self.radius as f32)) + 1.0);
+    draw_poly(center, 6, outline_size, 0.0, inner_color);
+    draw_poly_lines_ex(center, 6, outline_size, 0.0, 2.0, outer_color);
 }
 
 fn Board_draw(self: *Board, gs: *GameState) void {
+    Board_draw_outline(self)
+
     let white = Color {.r=255,.g=255,.b=255,.a=255};
+    let radius = self.radius;
 
-    let mut row: usize = 0;
-    while row < 5 {
-        let mut col: usize = 0;
-        while col < 5 {
-            let tile = self.tiles[row][col];
+    let mut r: s32 = 0 - radius;
+    while r <= radius {
+        let qmin = q_min_for_row(r, radius);
+        let qmax = q_max_for_row(r, radius);
+        let mut q: s32 = qmin;
+        while q <= qmax {
+            let idx = axial_to_index(q, r, radius);
+            let tile = self.tiles[idx];
             if tile.exists {
-                let q: s32 = (col as s32) - self.radius;
-                let r: s32 = (row as s32) - self.radius;
-                let pixel: Vector2 = axial_to_pixel(q, r, self.hex_size);
-
+                let pixel = axial_to_pixel(q, r, self.hex_size);
                 let center = Vector2 {
                     .x = pixel.x + (self.offset_x as f32),
                     .y = pixel.y + (self.offset_y as f32),
                 };
-
                 let value = tile.value as s32;
-                draw_hex(center, value, self.hex_size, white, true);
+                draw_tile(center, value, self.hex_size, white, true);
             }
-
-            col = col + 1;
+            q = q + 1;
         }
-        row = row + 1;
+        r = r + 1;
     }
-}
-
-fn axial_to_pixel(q: s32, r: s32, size: f32) Vector2 {
-    let SQRT3: f32 = 1.7320508;
-    let x = size * 1.5 * (q as f32);
-    let mut y_row = r as f32;
-    let two: s32 = 2;
-    let col_offset: f32 = if !(q % two == 0) { 0.5 } else { 0.0 };
-    let y = size * SQRT3 * (y_row + col_offset);
-    let vec = Vector2 { .x = x, .y = y };
-    return vec;
-}
-
-/// places number into a \0 terminated string
-fn number_to_c_string(score: s32, out: *[11; u8]) void {
-    let mut buffer: [11; u8] = "          \0";
-    fmt::convert_s32_to_array(score, &buffer);
-
-    let mut start: usize = 0;
-    while start < 11 and buffer[start] == 32 {
-        start = start + 1;
-    }
-
-    let mut i: usize = 0;
-    let mut idx: usize = start;
-    while idx < 11 {
-        out[i] = buffer[idx];
-        i = i + 1;
-        idx = idx + 1;
-    }
-}
-
-fn draw_hex(center: Vector2, value: s32, size: f32, color: Color, filled: bool) void {
-    if (filled) {
-        draw_poly(center, 6, size, 0.0, color);
-    }
-    let black = Color {.r=0,.g=0,.b=0,.a=255};
-    draw_poly_lines_ex(center, 6, size, 0.0, 2.0, black);
-    let x = center.x as s32;
-    let y = center.y as s32;
-    let text_size = 20;
-    let text: [11; u8] = [0;11];
-    number_to_c_string(value, &text);
-    let text_width = measure_text(&text, text_size);
-    draw_text(&text, x - text_width / 2, y - text_size / 2, text_size, black);
 }
 
 pub fn main() void {
@@ -450,7 +406,6 @@ pub fn main() void {
         .board = Board_new(screen_width, screen_height),
     };
 
-    let board_bg_color = Color {.r=0x18,.g=0x18,.b=0x1A,.a=0xFF};
     while !window_should_close() {
         // UPDATE
 
@@ -476,8 +431,6 @@ pub fn main() void {
         clear_background(gs.bg);
 
         // DARW
-        let offset = 100;
-        draw_rectangle(offset + 20, offset, 720 - (offset*2) - 40, 720 - (offset*2) + 50, board_bg_color);
         Board_draw(&gs.board, &gs);
 
         end_drawing();
