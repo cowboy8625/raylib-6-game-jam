@@ -14,6 +14,8 @@ Currently the compiler does not support all the needed features to run natively 
 git clone https://github.com/c-flat-lang/c-flat.git
 cd c-flat
 ./install.sh # optional but not needed --features wasm-runtime,debug
+cp -r web <project path>
+cp -r scripts <project path>
 
 # project setup
 git clone https://github.com/cowboy8625/raylib-6-game-jam.git

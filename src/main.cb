@@ -135,6 +135,28 @@ fn tile_color(value: s32) Color {
     }
 }
 
+fn board_push_move_anim(self: *Board, value: u32, sq: s32, sr: s32, dest_x: f32, dest_y: f32, kind: AnimKind) void {
+    let src_pixel = axial_to_pixel(sq, sr, self.hex_size);
+    let src_x = src_pixel.x + (self.offset_x as f32);
+    let src_y = src_pixel.y + (self.offset_y as f32);
+
+    if kind == AnimKind::moving and src_x == dest_x and src_y == dest_y {
+        return; // didn't actually move, nothing to show
+    }
+
+    self.anims[self.anim_count] = TileAnim {
+        .active = true,
+        .kind = kind,
+        .value = value,
+        .from_x = src_x,
+        .from_y = src_y,
+        .to_x = dest_x,
+        .to_y = dest_y,
+        .dest_idx = axial_to_index(sq, sr, self.radius),
+    };
+    self.anim_count = self.anim_count + 1;
+}
+
 fn draw_tile(center: Vector2, value: s32, size: f32, color: Color) void {
     draw_poly(center, 6, size, 0.0, color);
     let black = Color {.r=0,.g=0,.b=0,.a=255};
@@ -212,16 +234,46 @@ type HexCoord struct {
     valid: bool,
 }
 
+type AnimKind enum {
+    none,
+    moving,
+    merging,
+    spawning,
+}
+
+type TileAnim struct {
+    kind: AnimKind = AnimKind::none,
+
+    // Defaults
+    active: bool = false,
+    value: u32 = 0,
+    from_x: f32 = 0.0,
+    from_y: f32 = 0.0,
+    to_x: f32 = 0.0,
+    to_y: f32 = 0.0,
+    dest_idx: usize = 0,
+}
+
+type AnimPhase enum {
+    idle,
+    moving,
+    spawning,
+}
+
 type Board struct {
     tiles: [19; HexTile],
     offset_x: s32,
     offset_y: s32,
-    // TODO: looks like default args are borked
+
     radius: s32 = 2,
     hex_size: f32 = 60.0,
-    ready: bool = true,
-    move_delay: f32 = 0.25,
-    move_cooldown: f32 = 0.0,
+
+    anims: [19; TileAnim],
+    anim_count: usize = 0,
+    anim_phase: AnimPhase = AnimPhase::idle,
+    anim_timer: f32 = 0.0,
+    move_anim_duration: f32 = 0.12,
+    spawn_anim_duration: f32 = 0.15,
 }
 
 fn Board_new(screen_width: s32, screen_height: s32) Board {
@@ -231,10 +283,17 @@ fn Board_new(screen_width: s32, screen_height: s32) Board {
         .tiles = [HexTile{}; 19],
         .radius = 2,
         .hex_size = 60.0,
-        .ready = true,
-        .move_delay = 0.25,
-        .move_cooldown = 0.0,
+
+        .anims = [TileAnim{}; 19],
+        .anim_count = 0,
+        .anim_phase = AnimPhase::idle,
+        .anim_timer = 0.0,
+        .move_anim_duration = 0.25,
+        .spawn_anim_duration = 0.25,
     };
+
+    Board_spawn(&b);
+
     return b;
 }
 
@@ -292,6 +351,24 @@ fn Board_check_game_over(self: *Board, gs: *GameState) void {
     gs.state = State::game_over;
 }
 
+fn index_to_axial(idx: usize, radius: s32) HexCoord {
+    let mut remaining: usize = idx;
+    let mut r: s32 = 0 - radius;
+
+    while r <= radius {
+        let len: usize = row_len(r, radius) as usize;
+        if remaining < len {
+            let qmin = q_min_for_row(r, radius);
+            let q = qmin + (remaining as s32);
+            return HexCoord { .q = q, .r = r, .valid = true };
+        }
+        remaining = remaining - len;
+        r = r + 1;
+    }
+
+    return HexCoord { .q = 0, .r = 0, .valid = false };
+}
+
 fn Board_spawn(self: *Board) void {
     let mut free_cells: [19; usize] = [0; 19];
     let mut free_count: usize = 0;
@@ -306,7 +383,6 @@ fn Board_spawn(self: *Board) void {
     }
 
     if free_count == 0 {
-        self.ready = false;
         return;
     }
 
@@ -332,13 +408,29 @@ fn Board_spawn(self: *Board) void {
         self.tiles[idx].value = value as u32;
         self.tiles[idx].exists = true;
 
+        let coord = index_to_axial(idx, self.radius);
+        let pixel = axial_to_pixel(coord.q, coord.r, self.hex_size);
+        let px = pixel.x + (self.offset_x as f32);
+        let py = pixel.y + (self.offset_y as f32);
+
+        self.anims[self.anim_count] = TileAnim {
+            .kind = AnimKind::spawning,
+            .active = true,
+            .value = value as u32,
+            .from_x = px,
+            .from_y = py,
+            .to_x = px,
+            .to_y = py,
+            .dest_idx = idx,
+        };
+
+        self.anim_count = self.anim_count + 1;
+
         free_count = free_count - 1;
         free_cells[pick] = free_cells[free_count];
 
         count = count - 1;
     }
-
-    self.ready = false;
 }
 
 fn Board_move(self: *Board, gs: *GameState, dir: Direction) void {
@@ -393,12 +485,16 @@ fn Board_move(self: *Board, gs: *GameState, dir: Direction) void {
                 }
 
                 let mut values: [5; u32] = [0, 0, 0, 0, 0];
+                let mut src_q: [5; s32] = [0, 0, 0, 0, 0];
+                let mut src_r: [5; s32] = [0, 0, 0, 0, 0];
                 let mut count: usize = 0;
                 let mut i: usize = 0;
                 while i < line_len {
                     let idx = axial_to_index(line_q[i], line_r[i], radius);
                     if self.tiles[idx].exists {
                         values[count] = self.tiles[idx].value;
+                        src_q[count] = line_q[i];
+                        src_r[count] = line_r[i];
                         count = count + 1;
                     }
                     i = i + 1;
@@ -408,14 +504,25 @@ fn Board_move(self: *Board, gs: *GameState, dir: Direction) void {
                 let mut merged_count: usize = 0;
                 let mut j: usize = 0;
                 while j < count {
+                    let dest_q = line_q[merged_count];
+                    let dest_r = line_r[merged_count];
+                    let dest_pixel = axial_to_pixel(dest_q, dest_r, self.hex_size);
+                    let dest_x = dest_pixel.x + (self.offset_x as f32);
+                    let dest_y = dest_pixel.y + (self.offset_y as f32);
+
                     if j + 1 < count and values[j] == values[j + 1] {
                         let new_value = values[j] + values[j + 1];
                         merged[merged_count] = new_value;
                         gs.score = gs.score + new_value;
+
+                        board_push_move_anim(self, values[j], src_q[j], src_r[j], dest_x, dest_y, AnimKind::merging);
+                        board_push_move_anim(self, values[j + 1], src_q[j + 1], src_r[j + 1], dest_x, dest_y, AnimKind::merging);
+
                         merged_count = merged_count + 1;
                         j = j + 2;
                     } else {
                         merged[merged_count] = values[j];
+                        board_push_move_anim(self, values[j], src_q[j], src_r[j], dest_x, dest_y, AnimKind::moving);
                         merged_count = merged_count + 1;
                         j = j + 1;
                     }
@@ -450,9 +557,9 @@ fn Board_move(self: *Board, gs: *GameState, dir: Direction) void {
     }
     if moved {
          play_sound(gs.merge_sound);
+         self.anim_phase = AnimPhase::moving;
+         self.anim_timer = 0.0;
     }
-
-    self.ready = moved;
 }
 
 fn negate(value: f32) f32 {
@@ -527,9 +634,46 @@ fn Board_draw_outline(self: *Board) void {
     draw_poly_lines_ex(center, 6, outline_size, 0.0, 2.0, outer_color);
 }
 
-fn Board_draw(self: *Board, gs: *GameState) void {
+fn Board_anim_duration_for_phase(self: *Board) f32 {
+    if self.anim_phase == AnimPhase::moving {
+        return self.move_anim_duration;
+    } else if self.anim_phase == AnimPhase::spawning {
+        return self.spawn_anim_duration;
+    } else {
+        return 0.0;
+    }
+}
 
+fn Board_update_anims(self: *Board, gs: *GameState, dt: f32) void {
+    if self.anim_phase == AnimPhase::moving {
+        self.anim_timer = self.anim_timer + dt;
+        if self.anim_timer >= self.move_anim_duration {
+            self.anim_count = 0;
+            Board_spawn(self);
+            self.anim_timer = 0.0;
+            self.anim_phase = AnimPhase::spawning;
+        }
+    } else if self.anim_phase == AnimPhase::spawning {
+        self.anim_timer = self.anim_timer + dt;
+        if self.anim_timer >= self.spawn_anim_duration {
+            self.anim_count = 0;
+            Board_check_game_over(self, gs);
+            self.anim_phase = AnimPhase::idle;
+        }
+    }
+}
+
+fn Board_draw(self: *Board, gs: *GameState) void {
     let radius = self.radius;
+    let mut masked: [19; bool] = [false; 19];
+
+    if !(self.anim_phase == AnimPhase::idle) {
+        let mut a: usize = 0;
+        while a < self.anim_count {
+            masked[self.anims[a].dest_idx] = true;
+            a = a + 1;
+        }
+    }
 
     let mut r: s32 = 0 - radius;
     while r <= radius {
@@ -539,7 +683,7 @@ fn Board_draw(self: *Board, gs: *GameState) void {
         while q <= qmax {
             let idx = axial_to_index(q, r, radius);
             let tile = self.tiles[idx];
-            if tile.exists {
+            if tile.exists and !masked[idx] {
                 let pixel = axial_to_pixel(q, r, self.hex_size);
                 let center = Vector2 {
                     .x = pixel.x + (self.offset_x as f32),
@@ -552,6 +696,30 @@ fn Board_draw(self: *Board, gs: *GameState) void {
             q = q + 1;
         }
         r = r + 1;
+    }
+
+    let mut a: usize = 0;
+    while a < self.anim_count {
+        let anim = self.anims[a];
+        let t = self.anim_timer / Board_anim_duration_for_phase(self);
+        let clamped_t = if t > 1.0 { 1.0 } else { t };
+
+        let x = anim.from_x + (anim.to_x - anim.from_x) * clamped_t;
+        let y = anim.from_y + (anim.to_y - anim.from_y) * clamped_t;
+
+        let mut scale: f32 = 1.0;
+        if anim.kind == AnimKind::merging {
+            scale = 1.0 - clamped_t;
+        } else if anim.kind == AnimKind::spawning {
+            scale = 0.75 + (0.25 * clamped_t);
+        }
+
+        let center = Vector2 { .x = x, .y = y };
+        let value = anim.value as s32;
+        let fill_color: Color = tile_color(value);
+        draw_tile(center, value, self.hex_size * scale, fill_color);
+
+        a = a + 1;
     }
 }
 
@@ -576,7 +744,7 @@ fn draw_game_over_screen(gs: *GameState) void {
 }
 
 fn draw_score(score: s32) void {
-    let color_black = Color {.r=0, .g=0, .b=0, .a=255};
+    let color_black = Color {.r=255, .g=255, .b=255, .a=255};
 
     let text_score: [11; u8] = [0;11];
     number_to_c_string(score, &text_score);
@@ -612,41 +780,30 @@ pub fn main() void {
 
 
     while !window_should_close() {
-        let dt = get_frame_time();
         // UPDATE
+        let dt = get_frame_time();
 
         if gs.state == State::running {
-            if gs.board.move_cooldown > 0.0 {
-                gs.board.move_cooldown = gs.board.move_cooldown - dt;
+            if !(gs.board.anim_phase == AnimPhase::idle) {
+                // do nothing?
             } else if is_key_pressed(KeyboardKey::w) {
                 Board_move(&gs.board, &gs, Direction::up);
-                gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::s) {
                 Board_move(&gs.board, &gs, Direction::down);
-                gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::e) {
                 Board_move(&gs.board, &gs, Direction::up_right);
-                gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::d) {
                 Board_move(&gs.board, &gs, Direction::down_right);
-                gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::q) {
                 Board_move(&gs.board, &gs, Direction::up_left);
-                gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::a) {
                 Board_move(&gs.board, &gs, Direction::down_left);
-                gs.board.move_cooldown = gs.board.move_delay;
             }
 
-            if gs.board.ready and !(gs.board.move_cooldown > 0.0) {
-                Board_spawn(&gs.board);
-                Board_check_game_over(&gs.board, &gs);
-            }
+            Board_update_anims(&gs.board, &gs, dt);
         } else if gs.state == State::game_over and is_key_pressed(KeyboardKey::r) {
             gs.board = Board_new(screen_width, screen_height);
             gs.state = State::running;
-            gs.board.ready = true;
-            gs.board.move_cooldown = 0.0;
         }
 
         begin_drawing();
