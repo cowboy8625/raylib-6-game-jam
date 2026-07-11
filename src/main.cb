@@ -804,6 +804,7 @@ pub fn main() void {
         } else if gs.state == State::game_over and is_key_pressed(KeyboardKey::r) {
             gs.board = Board_new(screen_width, screen_height);
             gs.state = State::running;
+            gs.score = 0;
         }
 
         begin_drawing();
