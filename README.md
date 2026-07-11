@@ -26,27 +26,34 @@ web/build-raylib-host.sh
 make run-web
 ```
 
-## $(Game Title)
+## 2048+
 
-![$(Game Title)](screenshots/screenshot000.png "$(Game Title)")
+![2048+](screenshots/screenshot000.png "$(Game Title)")
 
 ### Description
 
-$(Your Game Description)
+The classic 2048 game with an extra direction.
 
 ### Features
 
-- $(Game Feature 01)
-- $(Game Feature 02)
-- $(Game Feature 03)
+- It works
+- runs on custom language (yeah, end user does not care)
+- extra direction
 
 ### Controls
 
 Keyboard:
 
-- $(Game Control 01)
-- $(Game Control 02)
-- $(Game Control 03)
+**board movement**:
+
+- w: **up**
+- s: **down**
+- q: **up left**
+- a: **down left**
+- e: **up right**
+- d: **down right**
+
+- r: **restart game if in a loosing state**
 
 ### Screenshots
 
@@ -54,13 +61,11 @@ _TODO: Show your game to the world, animated GIFs recommended!._
 
 ### Developers
 
-- $(cowboy8625) - Dev, Art, Music
+- cowboy8625
 
 ### Links
 
-- YouTube Gameplay: $(YouTube Link)
 - itch.io Release: $(itch.io Game Page)
-- Steam Release: $(Steam Game Page)
 
 ### License
 
