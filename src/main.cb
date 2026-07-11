@@ -214,6 +214,7 @@ type Board struct {
     tiles: [19; HexTile],
     offset_x: s32,
     offset_y: s32,
+    // TODO: looks like default args are borked
     radius: s32 = 2,
     hex_size: f32 = 60.0,
     ready: bool = true,
@@ -226,6 +227,11 @@ fn Board_new(screen_width: s32, screen_height: s32) Board {
         .offset_x = screen_width / 2,
         .offset_y = screen_height / 2,
         .tiles = [HexTile{}; 19],
+        .radius = 2,
+        .hex_size = 60.0,
+        .ready = true,
+        .move_delay = 0.25,
+        .move_cooldown = 0.0,
     };
     return b;
 }
