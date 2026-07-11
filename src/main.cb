@@ -196,6 +196,7 @@ type GameState struct {
     screen_height: s32,
     bg: Color,
     board: Board,
+    merge_sound: Sound,
     state: State = State::running,
 }
 
@@ -317,7 +318,17 @@ fn Board_spawn(self: *Board) void {
         let pick = get_random_value(0, (free_count - 1) as s32) as usize;
         let idx = free_cells[pick];
 
-        self.tiles[idx].value = get_random_value(1, 2) as u32;
+        let mut value = get_random_value(1, 10)
+
+        if value == 10 {
+            value = 4;
+        } else if value >= 5 {
+            value = 2;
+        } else if value < 5 {
+            value = 1;
+        }
+
+        self.tiles[idx].value = value as u32;
         self.tiles[idx].exists = true;
 
         free_count = free_count - 1;
@@ -329,7 +340,7 @@ fn Board_spawn(self: *Board) void {
     self.ready = false;
 }
 
-fn Board_move(self: *Board, dir: Direction) void {
+fn Board_move(self: *Board, gs: *GameState, dir: Direction) void {
     let radius = self.radius;
     let rev = Direction_reverse(dir);
     let mut moved: bool = false;
@@ -432,6 +443,9 @@ fn Board_move(self: *Board, dir: Direction) void {
             q = q + 1;
         }
         r = r + 1;
+    }
+    if moved {
+         play_sound(gs.merge_sound);
     }
 
     self.ready = moved;
@@ -563,6 +577,7 @@ pub fn main() void {
     let screen_height = 720;
 
     init_window(screen_width, screen_height, &"c-flat raylib game jam entry attempt\0");
+    init_audio_device();
     set_target_fps(60);
 
     let color_white = Color {.r=255, .g=255, .b=255, .a=255};
@@ -577,6 +592,7 @@ pub fn main() void {
             .a = 0xFF,
         },
         .board = Board_new(screen_width, screen_height),
+        .merge_sound = load_sound("./assets/merge_sound.wav\0")
     };
 
     while !window_should_close() {
@@ -587,22 +603,22 @@ pub fn main() void {
             if gs.board.move_cooldown > 0.0 {
                 gs.board.move_cooldown = gs.board.move_cooldown - dt;
             } else if is_key_pressed(KeyboardKey::w) {
-                Board_move(&gs.board, Direction::up);
+                Board_move(&gs.board, &gs, Direction::up);
                 gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::s) {
-                Board_move(&gs.board, Direction::down);
+                Board_move(&gs.board, &gs, Direction::down);
                 gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::e) {
-                Board_move(&gs.board, Direction::up_right);
+                Board_move(&gs.board, &gs, Direction::up_right);
                 gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::d) {
-                Board_move(&gs.board, Direction::down_right);
+                Board_move(&gs.board, &gs, Direction::down_right);
                 gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::q) {
-                Board_move(&gs.board, Direction::up_left);
+                Board_move(&gs.board, &gs, Direction::up_left);
                 gs.board.move_cooldown = gs.board.move_delay;
             } else if is_key_pressed(KeyboardKey::a) {
-                Board_move(&gs.board, Direction::down_left);
+                Board_move(&gs.board, &gs, Direction::down_left);
                 gs.board.move_cooldown = gs.board.move_delay;
             }
 
@@ -632,5 +648,7 @@ pub fn main() void {
 
         end_drawing();
     }
+
+    unload_sound(gs.merge_sound);
     close_window();
 }
