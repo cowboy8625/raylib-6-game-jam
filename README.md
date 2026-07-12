@@ -1,3 +1,5 @@
+<iframe frameborder="0" src="https://itch.io/embed/4768347?linkback=true&amp;bg_color=370404&amp;fg_color=ffffff&amp;link_color=b03131&amp;border_color=a69696" width="552" height="167"><a href="https://cowboy8625.itch.io/hex-2048">hex 2048+ by cowboy8625</a></iframe>
+
 #### Linux Build
 
 Currently the compiler does not support all the needed features to run natively on linux 😭.

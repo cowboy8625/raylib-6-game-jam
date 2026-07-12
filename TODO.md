@@ -1,6 +1,0 @@
-- add score
-- add sliding animation
-- add touch support
-- add art for tiles
-- and sounds for sliding
-- maybe some background music
