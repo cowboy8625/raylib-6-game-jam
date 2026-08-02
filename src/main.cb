@@ -815,6 +815,12 @@ pub fn main() void {
                 Board_move(&gs.board, &gs, Direction::down_left);
             }
 
+            if is_key_pressed(KeyboardKey::p) and is_music_stream_playing(music) {
+                pause_music_stream(music);
+            } else if is_key_pressed(KeyboardKey::p) and !is_music_stream_playing(music) {
+                play_music_stream(music);
+            }
+
             Board_update_anims(&gs.board, &gs, dt);
         } else if gs.state == State::game_over and is_key_pressed(KeyboardKey::r) {
             gs.board = Board_new(screen_width, screen_height);

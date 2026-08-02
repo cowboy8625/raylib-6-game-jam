@@ -323,6 +323,13 @@ export function makeRaylibHost(getCflatExports, canvas) {
         module._free(hostPath);
       }
     },
+    LoadMusicStreamFromMemory: (fileType, data, dataSize) => {
+      throw Error(
+        `Unimplemented LoadMusicStreamFromMemory ${fileType},${data}, ${dataSize}`,
+      );
+    },
+    IsMusicValid: (musicPtr) =>
+      module._cf_is_music_valid(cfDV().getInt32(musicPtr, true)),
     UnloadMusicStream: (musicPtr) =>
       module._cf_unload_music_stream(cfDV().getInt32(musicPtr, true)),
     PlayMusicStream: (musicPtr) =>
@@ -331,6 +338,26 @@ export function makeRaylibHost(getCflatExports, canvas) {
       module._cf_update_music_stream(cfDV().getInt32(musicPtr, true)),
     IsMusicStreamPlaying: (musicPtr) =>
       module._cf_is_music_playing(cfDV().getInt32(musicPtr, true)),
+    StopMusicStream: (musicPtr) =>
+      module._cf_stop_music_stream(cfDV().getInt32(musicPtr, true)),
+    PauseMusicStream: (musicPtr) =>
+      module._cf_pause_music_stream(cfDV().getInt32(musicPtr, true)),
+    ResumeMusicStream: (musicPtr) =>
+      module._cf_resume_music_stream(cfDV().getInt32(musicPtr, true)),
+    SeekMusicStream: (musicPtr, position) =>
+      module._cf_seek_music_stream(cfDV().getInt32(musicPtr, true), position),
+    SetMusicVolume: (musicPtr, volumn) =>
+      module._cf_set_music_volume(cfDV().getInt32(musicPtr, true), volumn),
+    SetMusicPitch: (musicPtr, pitch) =>
+      module._cf_set_music_pitch(cfDV().getInt32(musicPtr, true), pitch),
+    SetMusicPan: (musicPtr, pan) =>
+      module._cf_set_music_pitch(cfDV().getInt32(musicPtr, true), pan),
+    GetMusicTimeLength: (musicPtr) =>
+      module._cf_get_music_time_length(cfDV().getInt32(musicPtr, true)),
+    GetMusicTimeLength: (musicPtr) =>
+      module._cf_get_music_time_length(cfDV().getInt32(musicPtr, true)),
+    GetMusicTimePlayed: (musicPtr) =>
+      module._cf_get_music_time_played(cfDV().getInt32(musicPtr, true)),
 
     // Random number
     SetRandomSeed: (seed) => module._SetRandomSeed(seed),
