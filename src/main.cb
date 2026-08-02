@@ -14,7 +14,12 @@
 // *   this game.
 // ********************************************************************************************
 
+extern C fn write_s32(s32) void;
+extern C fn write_char(u8) void;
+extern C fn write(*[u8], usize) void;
 extern C fn is_mobile() bool;
+extern C fn sqrtf(f32) f32;
+extern C fn atan2f(f32, f32) f32;
 
 use std::raylib;
 use std::math;
@@ -756,6 +761,68 @@ fn draw_score(score: s32) void {
     draw_text(&text_score, 10, 10, 40, color_black);
 }
 
+type SwipeDirection enum {
+    none,
+    up,
+    up_left,
+    up_right,
+    down,
+    down_left,
+    down_right,
+    left,
+    right,
+}
+
+type SwipeState struct {
+    start_x: f32 = 0.0,
+    start_y: f32 = 0.0,
+    dragging: bool = false,
+    min_dist: f32 = 20.0,
+}
+
+fn get_swipe_direction(state: *SwipeState) SwipeDirection {
+
+    if is_mouse_button_pressed(MouseButton::left) {
+        state.start_x = get_touch_x() as f32;// get_mouse_x() as f32;
+        state.start_y = get_touch_y() as f32;// get_mouse_y() as f32;
+        state.dragging = true;
+        return SwipeDirection::none;
+    }
+
+    if state.dragging and is_mouse_button_released(MouseButton::left) {
+        state.dragging = false;
+
+        let end_x = get_touch_x() as f32;// get_mouse_x() as f32;
+        let end_y = get_touch_y() as f32;// get_mouse_x() as f32;
+
+        let dx: f32 = end_x - state.start_x;
+        let dy: f32 = end_y - state.start_y;
+
+        let len: f32 = sqrtf(dx * dx + dy * dy);
+        if (len < state.min_dist) {
+            return SwipeDirection::none;
+        }
+
+        let angle: f32 = atan2f(0.0 - dy, dx) * RAD2DEG();
+
+        if angle < 0.0 {
+            angle = angle + 360.0;
+        }
+
+        if angle >= 337.5 or angle < 22.5 { return SwipeDirection::right }
+        if angle < 67.5 { return SwipeDirection::up_right }
+        if angle < 112.5 { return SwipeDirection::up }
+        if angle < 157.5 { return SwipeDirection::up_left }
+        if angle < 202.5 { return SwipeDirection::left }
+        if angle < 247.5 { return SwipeDirection::down_left }
+        if angle < 292.5 { return SwipeDirection::down }
+
+        return SwipeDirection::down_right;
+    }
+
+    return SwipeDirection::none;
+}
+
 
 pub fn main() void {
     let screen_width = 720;
@@ -791,6 +858,7 @@ pub fn main() void {
     let music = load_music_stream("./assets/music.mp3\0");
 
     play_music_stream(music);
+    let mut swipe_state = SwipeState{};
 
     while !window_should_close() {
         // UPDATE
@@ -799,19 +867,19 @@ pub fn main() void {
         update_music_stream(music);
 
         if gs.state == State::running {
-            if !(gs.board.anim_phase == AnimPhase::idle) {
-                // do nothing?
-            } else if is_key_pressed(KeyboardKey::w) {
+            let swipe_direction = get_swipe_direction(&swipe_state)
+
+            if is_key_pressed(KeyboardKey::w) or swipe_direction == SwipeDirection::up {
                 Board_move(&gs.board, &gs, Direction::up);
-            } else if is_key_pressed(KeyboardKey::s) {
+            } else if is_key_pressed(KeyboardKey::s) or swipe_direction == SwipeDirection::down {
                 Board_move(&gs.board, &gs, Direction::down);
-            } else if is_key_pressed(KeyboardKey::e) {
+            } else if is_key_pressed(KeyboardKey::e) or swipe_direction == SwipeDirection::up_right {
                 Board_move(&gs.board, &gs, Direction::up_right);
-            } else if is_key_pressed(KeyboardKey::d) {
+            } else if is_key_pressed(KeyboardKey::d) or swipe_direction == SwipeDirection::down_right {
                 Board_move(&gs.board, &gs, Direction::down_right);
-            } else if is_key_pressed(KeyboardKey::q) {
+            } else if is_key_pressed(KeyboardKey::q) or swipe_direction == SwipeDirection::up_left {
                 Board_move(&gs.board, &gs, Direction::up_left);
-            } else if is_key_pressed(KeyboardKey::a) {
+            } else if is_key_pressed(KeyboardKey::a) or swipe_direction == SwipeDirection::down_left {
                 Board_move(&gs.board, &gs, Direction::down_left);
             }
 

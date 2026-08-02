@@ -196,6 +196,28 @@ export function makeRaylibHost(getCflatExports, canvas) {
     GetMouseY: () => module._GetMouseY(),
     IsGamepadButtonPressed: (pad, btn) =>
       module._IsGamepadButtonPressed(pad, btn),
+    GetTouchX: () => module._GetTouchX(),
+    GetTouchY: () => module._GetTouchY(),
+    GetTouchPosition: (index) => {
+      throw new Error("This needs a shim in C, returns a Vector2");
+      // return module._GetTouchPosition(index);
+    },
+    GetTouchPointId: (index) => module._GetTouchPointId(index),
+    GetTouchPointCount: () => module._GetTouchPointCount(),
+    SetGesturesEnabled: (flags) => module._SetGesturesEnabled(flags),
+    IsGestureDetected: (gesture) => module._IsGestureDetected(gesture),
+    GetGestureDetected: () => module._GetGestureDetected(),
+    GetGestureHoldDuration: () => module._GetGestureHoldDuration(),
+    GetGestureDragVector: () => {
+      throw new Error("This needs a shim in C, returns a Vector2");
+      // return module._GetGestureDragVector();
+    },
+    GetGestureDragAngle: () => module._GetGestureDragAngle(),
+    GetGesturePinchVector: () => {
+      throw new Error("This needs a shim in C, returns a Vector2");
+      // return module._GetGesturePinchVector();
+    },
+    GetGesturePinchAngle: () => module._GetGesturePinchAngle(),
     GetFrameTime: () => module._GetFrameTime(),
     CheckCollisionRecs: (aPtr, bPtr) => {
       const a = readRect(aPtr);
@@ -375,7 +397,6 @@ export function makeRaylibHost(getCflatExports, canvas) {
       globalThis.__cflat_log(s);
       return 0;
     },
-
     // Only for this game
     is_mobile: () => {
       const height = window.innerHeight;
@@ -384,6 +405,9 @@ export function makeRaylibHost(getCflatExports, canvas) {
       if (width < 720) return true;
       return false;
     },
+
+    sqrtf: (x) => Math.fround(Math.sqrt(x)),
+    atan2f: (y, x) => Math.fround(Math.atan2(y, x)),
   };
 
   return {
