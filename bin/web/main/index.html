@@ -19,9 +19,27 @@
           14px/1.5 system-ui,
           sans-serif;
       }
+
       canvas {
         border: 1px solid #333;
         background: #000;
+      }
+
+      @media (max-width: 720px), (max-height: 720px) {
+        body {
+          padding: 8px;
+        }
+
+        canvas {
+          width: min(100vw - 16px, calc((100vh - 16px) * 4 / 3));
+          height: min(100vw - 16px, calc((100vh - 16px) * 4 / 3));
+          aspect-ratio: 4 / 3;
+          display: block;
+        }
+
+        #log {
+          width: min(100vw - 16px, calc((100vh - 16px) * 4 / 3));
+        }
       }
       #log {
         width: 640px;

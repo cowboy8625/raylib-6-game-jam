@@ -35,6 +35,11 @@ int cf_check_collision_recs(float ax, float ay, float aw, float ah, float bx,
                             (Rectangle){bx, by, bw, bh});
 }
 
+int cf_check_collision_point_rec(float px, float py, float rx, float ry,
+                                 float rw, float rh) {
+  return CheckCollisionPointRec((Vector2){px, py}, (Rectangle){rx, ry, rw, rh});
+}
+
 // Textures. LoadTexture returns a Texture2D by value; write its 5 ints to an
 // out buffer the bridge reads back. Draw/Unload reconstruct the struct from
 // scalars the bridge unpacked out of c-flat memory.
@@ -157,4 +162,40 @@ void cf_unload_sound(int h) {
 
 int cf_is_sound_valid(int h) {
   return cf_sound_valid_handle(h) ? IsSoundValid(cf_sounds[h]) : 0;
+}
+
+#define CF_MAX_MUSICS 256
+static Music cf_musics[CF_MAX_MUSICS];
+static int cf_musics_count = 0;
+
+static int cf_music_valid_handle(int h) {
+  return h >= 0 && h < cf_musics_count;
+}
+
+int cf_load_music_stream(const char *path) {
+  if (cf_musics_count >= CF_MAX_MUSICS)
+    return -1;
+  Music m = LoadMusicStream(path);
+  int h = cf_musics_count++;
+  cf_musics[h] = m;
+  return h;
+}
+
+void cf_unload_music_stream(int h) {
+  if (cf_music_valid_handle(h))
+    UnloadMusicStream(cf_musics[h]);
+}
+
+void cf_play_music_stream(int h) {
+  if (cf_music_valid_handle(h))
+    PlayMusicStream(cf_musics[h]);
+}
+
+void cf_update_music_stream(int h) {
+  if (cf_music_valid_handle(h))
+    UpdateMusicStream(cf_musics[h]);
+}
+
+int cf_is_music_playing(int h) {
+  return cf_music_valid_handle(h) ? IsMusicStreamPlaying(cf_musics[h]) : 0;
 }

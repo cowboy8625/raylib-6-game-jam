@@ -14,9 +14,7 @@
 // *   this game.
 // ********************************************************************************************
 
-extern C fn write_s32(s32) void;
-extern C fn write_char(u8) void;
-extern C fn write(*[u8], usize) void;
+extern C fn is_mobile() bool;
 
 use std::raylib;
 use std::math;
@@ -218,7 +216,7 @@ type GameState struct {
     screen_height: s32,
     bg: Color,
     board: Board,
-    merge_sound: Sound,
+    merge_sounds: [5; Sound],
     score: u32 = 0,
     state: State = State::running,
 }
@@ -556,10 +554,16 @@ fn Board_move(self: *Board, gs: *GameState, dir: Direction) void {
         r = r + 1;
     }
     if moved {
-         play_sound(gs.merge_sound);
-         self.anim_phase = AnimPhase::moving;
-         self.anim_timer = 0.0;
+        play_merge_sound(&gs.merge_sounds)
+        self.anim_phase = AnimPhase::moving;
+        self.anim_timer = 0.0;
     }
+}
+
+fn play_merge_sound(sounds: *[5; Sound]) void {
+    let index: usize = get_random_value(0, 4) as usize;
+    let sound: *Sound = &sounds[index];
+    play_sound(sound);
 }
 
 fn negate(value: f32) f32 {
@@ -773,15 +777,26 @@ pub fn main() void {
             .a = 0xFF,
         },
         .board = Board_new(screen_width, screen_height),
-        .merge_sound = load_sound("./assets/merge_sound.wav\0"),
+        .merge_sounds = [
+            load_sound("./assets/merge_sound_1.wav\0"),
+            load_sound("./assets/merge_sound_2.wav\0"),
+            load_sound("./assets/merge_sound_3.wav\0"),
+            load_sound("./assets/merge_sound_4.wav\0"),
+            load_sound("./assets/merge_sound_5.wav\0"),
+        ],
         .score = 0,
         .state = State::running,
     };
 
+    let music = load_music_stream("./assets/music.mp3\0");
+
+    play_music_stream(music);
 
     while !window_should_close() {
         // UPDATE
         let dt = get_frame_time();
+
+        update_music_stream(music);
 
         if gs.state == State::running {
             if !(gs.board.anim_phase == AnimPhase::idle) {
@@ -816,7 +831,9 @@ pub fn main() void {
 
         Board_draw_outline(&gs.board);
         Board_draw_grid(&gs.board);
-        Board_draw_direction_labels(&gs.board);
+        if !is_mobile() {
+            Board_draw_direction_labels(&gs.board);
+        }
         Board_draw(&gs.board, &gs);
 
         if gs.state == State::game_over {
@@ -826,6 +843,15 @@ pub fn main() void {
         end_drawing();
     }
 
-    unload_sound(gs.merge_sound);
+    let sound_index: usize = 0;
+    while sound_index < gs.merge_sounds.len {
+        unload_sound(gs.merge_sounds[sound_index]);
+        sound_index = sound_index + 1;
+    }
+
+    unload_music_stream(music);
+
+    close_audio_device();
+
     close_window();
 }

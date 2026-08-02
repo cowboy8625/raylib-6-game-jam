@@ -61,10 +61,6 @@ export function makeRaylibHost(getCflatExports, canvas) {
   };
 
   const readVector2 = (ptr) => {
-    const buf = cfMem().buffer;
-    if (ptr < 0 || ptr + 8 > buf.byteLength) {
-      console.error("BAD Vector2 ptr:", ptr, "buffer size:", buf.byteLength);
-    }
     const d = cfDV();
     return [d.getFloat32(ptr, true), d.getFloat32(ptr + 4, true)];
   };
@@ -215,6 +211,18 @@ export function makeRaylibHost(getCflatExports, canvas) {
         b[3],
       );
     },
+    CheckCollisionPointRec: (vector2Ptr, rectPtr) => {
+      const r = readRect(rectPtr);
+      const v = readVector2(vector2Ptr);
+      return module._cf_check_collision_point_rec(
+        v[0],
+        v[1],
+        r[0],
+        r[1],
+        r[2],
+        r[3],
+      );
+    },
 
     LoadTexture: (pathPtr) => {
       const path = readCStr(pathPtr);
@@ -301,6 +309,29 @@ export function makeRaylibHost(getCflatExports, canvas) {
     WaveFormat: (wave, a, b, c) => module._WaveFormat(wave, a, b, c),
     LoadWaveSamples: (wave) => module._LoadWaveSamples(wave),
     UnloadWaveSamples: (v) => module._UnloadWaveSamples(v),
+
+    // Music
+    LoadMusicStream: (pathPtr) => {
+      const path = readCStr(pathPtr);
+      const hostPath = toHostStr(path);
+      try {
+        const h = module._cf_load_music_stream(hostPath);
+        const cfPtr = cfAlloc(4);
+        cfDV().setInt32(cfPtr, h, true);
+        return cfPtr; // Sound { handle: s32 }
+      } finally {
+        module._free(hostPath);
+      }
+    },
+    UnloadMusicStream: (musicPtr) =>
+      module._cf_unload_music_stream(cfDV().getInt32(musicPtr, true)),
+    PlayMusicStream: (musicPtr) =>
+      module._cf_play_music_stream(cfDV().getInt32(musicPtr, true)),
+    UpdateMusicStream: (musicPtr) =>
+      module._cf_update_music_stream(cfDV().getInt32(musicPtr, true)),
+    IsMusicStreamPlaying: (musicPtr) =>
+      module._cf_is_music_playing(cfDV().getInt32(musicPtr, true)),
+
     // Random number
     SetRandomSeed: (seed) => module._SetRandomSeed(seed),
     GetRandomValue: (min, max) => module._GetRandomValue(min, max),
@@ -316,6 +347,15 @@ export function makeRaylibHost(getCflatExports, canvas) {
       const s = new TextDecoder().decode(cfU8().subarray(ptr, ptr + len));
       globalThis.__cflat_log(s);
       return 0;
+    },
+
+    // Only for this game
+    is_mobile: () => {
+      const height = window.innerHeight;
+      const width = window.innerWidth;
+      if (height < 720) return true;
+      if (width < 720) return true;
+      return false;
     },
   };
 
