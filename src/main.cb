@@ -226,6 +226,8 @@ type GameState struct {
     state: State = State::running,
     is_game_music_playing: bool = true,
     music_toggle: Rectangle,
+    is_game_sounds_playing: bool = true,
+    sounds_toggle: Rectangle,
 }
 
 type HexTile struct {
@@ -561,7 +563,9 @@ fn Board_move(self: *Board, gs: *GameState, dir: Direction) void {
         r = r + 1;
     }
     if moved {
-        play_merge_sound(&gs.merge_sounds)
+        if gs.is_game_sounds_playing {
+            play_merge_sound(&gs.merge_sounds)
+        }
         self.anim_phase = AnimPhase::moving;
         self.anim_timer = 0.0;
     }
@@ -825,6 +829,59 @@ fn get_swipe_direction(state: *SwipeState) SwipeDirection {
     return SwipeDirection::none;
 }
 
+fn draw_sounds_toggle(gs: *GameState) void {
+    let color = Color {
+        .r = 0x19,
+        .g = 0x19,
+        .b = 0x1B,
+        .a = 0xFF,
+    };
+
+    let x: s32 = gs.sounds_toggle.x as s32;
+    let y: s32 = gs.sounds_toggle.y as s32;
+    let width: s32 = gs.sounds_toggle.width as s32;
+    let height: s32 = gs.sounds_toggle.height as s32;
+    let offset: s32 = 5;
+
+    let bg_color = if gs.is_game_sounds_playing {
+        Color {
+            .r = 0x29,
+            .g = 0x29,
+            .b = 0x2B,
+            .a = 0xFF,
+        }
+    } else {
+        Color {
+            .r = 0xEE,
+            .g = 0xEE,
+            .b = 0xEE,
+            .a = 0xFF,
+        }
+    };
+
+    draw_rectangle(
+        x,
+        y,
+        width,
+        height,
+        color
+    );
+
+    draw_rectangle(
+        x + offset,
+        y + offset,
+        width - offset * 2,
+        height - offset * 2,
+        bg_color
+    );
+
+    if gs.is_game_sounds_playing {
+        draw_text(&"Mute Sounds\0", x+width+5, y+5, 20, Color {.r=0XEE,.g=0XEE,.b=0XEE,.a=0XFF});
+    } else {
+        draw_text(&"Unmute Sounds\0", x+width+5, y+5, 20, Color {.r=0XEE,.g=0XEE,.b=0XEE,.a=0XFF});
+    }
+}
+
 fn draw_music_toggle(gs: *GameState) void {
     let color = Color {
         .r = 0x19,
@@ -871,7 +928,11 @@ fn draw_music_toggle(gs: *GameState) void {
         bg_color
     );
 
-    draw_text(&"Toggle Music\0", x+width+5, y+5, 20, Color {.r=0XEE,.g=0XEE,.b=0XEE,.a=0XFF});
+    if gs.is_game_music_playing {
+        draw_text(&"Mute Music\0", x+width+5, y+5, 20, Color {.r=0XEE,.g=0XEE,.b=0XEE,.a=0XFF});
+    } else {
+        draw_text(&"Unmute Music\0", x+width+5, y+5, 20, Color {.r=0XEE,.g=0XEE,.b=0XEE,.a=0XFF});
+    }
 }
 
 
@@ -908,6 +969,13 @@ pub fn main() void {
         .music_toggle = Rectangle {
             .x = 20.0,
             .y = (screen_height - 50) as f32,
+            .width = 32.0,
+            .height = 32.0,
+        },
+        .is_game_sounds_playing = true,
+        .sounds_toggle = Rectangle {
+            .x = 20.0,
+            .y = (screen_height - 100) as f32,
             .width = 32.0,
             .height = 32.0,
         },
@@ -969,6 +1037,8 @@ pub fn main() void {
                 play_music_stream(music);
             }
             gs.is_game_music_playing = !gs.is_game_music_playing;
+        } else if is_mouse_button_pressed(MouseButton::left) and check_collision_point_rec(mouse_pos, gs.sounds_toggle) {
+            gs.is_game_sounds_playing = !gs.is_game_sounds_playing;
         }
 
         begin_drawing();
@@ -986,6 +1056,7 @@ pub fn main() void {
         Board_draw(&gs.board, &gs);
 
         draw_music_toggle(&gs);
+        draw_sounds_toggle(&gs);
 
         if gs.state == State::game_over {
             draw_game_over_screen(&gs);
