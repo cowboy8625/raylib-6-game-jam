@@ -224,6 +224,8 @@ type GameState struct {
     merge_sounds: [5; Sound],
     score: u32 = 0,
     state: State = State::running,
+    is_game_music_playing: bool = true,
+    music_toggle: Rectangle,
 }
 
 type HexTile struct {
@@ -823,6 +825,55 @@ fn get_swipe_direction(state: *SwipeState) SwipeDirection {
     return SwipeDirection::none;
 }
 
+fn draw_music_toggle(gs: *GameState) void {
+    let color = Color {
+        .r = 0x19,
+        .g = 0x19,
+        .b = 0x1B,
+        .a = 0xFF,
+    };
+
+    let x: s32 = gs.music_toggle.x as s32;
+    let y: s32 = gs.music_toggle.y as s32;
+    let width: s32 = gs.music_toggle.width as s32;
+    let height: s32 = gs.music_toggle.height as s32;
+    let offset: s32 = 5;
+
+    let bg_color = if gs.is_game_music_playing {
+        Color {
+            .r = 0x29,
+            .g = 0x29,
+            .b = 0x2B,
+            .a = 0xFF,
+        }
+    } else {
+        Color {
+            .r = 0xEE,
+            .g = 0xEE,
+            .b = 0xEE,
+            .a = 0xFF,
+        }
+    };
+
+    draw_rectangle(
+        x,
+        y,
+        width,
+        height,
+        color
+    );
+
+    draw_rectangle(
+        x + offset,
+        y + offset,
+        width - offset * 2,
+        height - offset * 2,
+        bg_color
+    );
+
+    draw_text(&"Toggle Music\0", x+width+5, y+5, 20, Color {.r=0XEE,.g=0XEE,.b=0XEE,.a=0XFF});
+}
+
 
 pub fn main() void {
     let screen_width = 720;
@@ -853,12 +904,24 @@ pub fn main() void {
         ],
         .score = 0,
         .state = State::running,
+        .is_game_music_playing = true,
+        .music_toggle = Rectangle {
+            .x = 20.0,
+            .y = (screen_height - 50) as f32,
+            .width = 32.0,
+            .height = 32.0,
+        },
     };
 
     let music = load_music_stream("./assets/music.mp3\0");
 
     play_music_stream(music);
     let mut swipe_state = SwipeState{};
+
+    let mut mouse_pos = Vector2 {
+        .x = get_mouse_x() as f32,
+        .y = get_mouse_y() as f32,
+    };
 
     while !window_should_close() {
         // UPDATE
@@ -896,6 +959,18 @@ pub fn main() void {
             gs.score = 0;
         }
 
+        mouse_pos.x = get_mouse_x() as f32;
+        mouse_pos.y = get_mouse_y() as f32;
+
+        if is_mouse_button_pressed(MouseButton::left) and check_collision_point_rec(mouse_pos, gs.music_toggle) {
+            if gs.is_game_music_playing {
+                pause_music_stream(music);
+            } else {
+                play_music_stream(music);
+            }
+            gs.is_game_music_playing = !gs.is_game_music_playing;
+        }
+
         begin_drawing();
         clear_background(gs.bg);
 
@@ -909,6 +984,8 @@ pub fn main() void {
             Board_draw_direction_labels(&gs.board);
         }
         Board_draw(&gs.board, &gs);
+
+        draw_music_toggle(&gs);
 
         if gs.state == State::game_over {
             draw_game_over_screen(&gs);
