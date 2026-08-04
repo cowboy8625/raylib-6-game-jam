@@ -331,6 +331,8 @@ export function makeRaylibHost(getCflatExports, canvas) {
     WaveFormat: (wave, a, b, c) => module._WaveFormat(wave, a, b, c),
     LoadWaveSamples: (wave) => module._LoadWaveSamples(wave),
     UnloadWaveSamples: (v) => module._UnloadWaveSamples(v),
+    SetAudioStreamBufferSizeDefault: (size) =>
+      module._SetAudioStreamBufferSizeDefault(size),
 
     // Music
     LoadMusicStream: (pathPtr) => {
