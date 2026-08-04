@@ -223,11 +223,13 @@ type GameState struct {
     board: Board,
     merge_sounds: [5; Sound],
     score: u32 = 0,
-    state: State = State::running,
+    state: State = State::game_over,
     is_game_music_playing: bool = true,
     music_toggle: Rectangle,
     is_game_sounds_playing: bool = true,
     sounds_toggle: Rectangle,
+    reset: bool = false,
+    reset_button: Rectangle,
 }
 
 type HexTile struct {
@@ -749,13 +751,38 @@ fn draw_game_over_screen(gs: *GameState) void {
     let title_x = gs.screen_width / 2 - title_width / 2;
     let title_y = gs.screen_height / 2 - title_size;
     draw_text(&title_text, title_x, title_y, title_size, white);
+    if !is_mobile() {
+        let sub_text = "Press R to Restart\0";
+        let sub_size: s32 = 24;
+        let sub_width = measure_text(&sub_text, sub_size);
+        let sub_x = gs.screen_width / 2 - sub_width / 2;
+        let sub_y = gs.screen_height / 2 + 16;
+        draw_text(&sub_text, sub_x, sub_y, sub_size, white);
+    } else {
 
-    let sub_text = "Press R to Restart\0";
-    let sub_size: s32 = 24;
-    let sub_width = measure_text(&sub_text, sub_size);
-    let sub_x = gs.screen_width / 2 - sub_width / 2;
-    let sub_y = gs.screen_height / 2 + 16;
-    draw_text(&sub_text, sub_x, sub_y, sub_size, white);
+        let x: s32 = gs.reset_button.x as s32;
+        let y: s32 = gs.reset_button.y as s32;
+        let width: s32 = gs.reset_button.width as s32;
+        let height: s32 = gs.reset_button.height as s32;
+
+        let bg_color = Color {
+            .r = 0x29,
+            .g = 0x29,
+            .b = 0x2B,
+            .a = 0xFF,
+        };
+
+        draw_rectangle(
+            x,
+            y,
+            width,
+            height,
+            bg_color
+        );
+
+        let sub_size: s32 = 24;
+        draw_text(&"Reset\0", x+7, y+10, 40, white);
+    }
 }
 
 fn draw_score(score: s32) void {
@@ -965,7 +992,7 @@ pub fn main() void {
             load_sound("./assets/merge_sound_5.wav\0"),
         ],
         .score = 0,
-        .state = State::running,
+        // .state = State::running,
         .is_game_music_playing = true,
         .music_toggle = Rectangle {
             .x = 20.0,
@@ -979,6 +1006,12 @@ pub fn main() void {
             .y = (screen_height - 100) as f32,
             .width = 32.0,
             .height = 32.0,
+        },
+        .reset_button = Rectangle {
+            .x = (screen_width / 2 - 64) as f32,
+            .y = (screen_height / 2 + 20) as f32,
+            .width = 128.0,
+            .height = 64.0,
         },
     };
 
@@ -1022,10 +1055,11 @@ pub fn main() void {
             }
 
             Board_update_anims(&gs.board, &gs, dt);
-        } else if gs.state == State::game_over and is_key_pressed(KeyboardKey::r) {
+        } else if gs.state == State::game_over and (is_key_pressed(KeyboardKey::r) or gs.reset) {
             gs.board = Board_new(screen_width, screen_height);
             gs.state = State::running;
             gs.score = 0;
+            gs.reset = false;
         }
 
         mouse_pos.x = get_mouse_x() as f32;
@@ -1040,6 +1074,8 @@ pub fn main() void {
             gs.is_game_music_playing = !gs.is_game_music_playing;
         } else if is_mouse_button_pressed(MouseButton::left) and check_collision_point_rec(mouse_pos, gs.sounds_toggle) {
             gs.is_game_sounds_playing = !gs.is_game_sounds_playing;
+        } else if is_mouse_button_pressed(MouseButton::left) and check_collision_point_rec(mouse_pos, gs.reset_button) {
+            gs.reset = true;
         }
 
         begin_drawing();

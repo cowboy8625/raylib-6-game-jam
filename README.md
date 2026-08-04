@@ -59,7 +59,6 @@ Keyboard:
 
 ### **TODO's**:
 
-- [ ] restart on mobile
 - [ ] save state in local browser storage
 - [ ] arrow replace letter controls on mobile
 - [ ] letter/arrow controls glow when that direction is active
