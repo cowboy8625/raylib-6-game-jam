@@ -57,6 +57,15 @@ Keyboard:
 
 - r: **restart game if in a loosing state**
 
+### **TODO's**:
+
+- [ ] restart on mobile
+- [ ] save state in local browser storage
+- [ ] arrow replace letter controls on mobile
+- [ ] letter/arrow controls glow when that direction is active
+- [ ] use a differnt font
+- [ ] texture for tiles
+
 ### Screenshots
 
 _TODO: Show your game to the world, animated GIFs recommended!._
