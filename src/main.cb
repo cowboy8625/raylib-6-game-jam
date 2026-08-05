@@ -223,7 +223,7 @@ type GameState struct {
     board: Board,
     merge_sounds: [5; Sound],
     score: u32 = 0,
-    state: State = State::game_over,
+    state: State = State::running,
     is_game_music_playing: bool = true,
     music_toggle: Rectangle,
     is_game_sounds_playing: bool = true,
@@ -992,7 +992,6 @@ pub fn main() void {
             load_sound("./assets/merge_sound_5.wav\0"),
         ],
         .score = 0,
-        // .state = State::running,
         .is_game_music_playing = true,
         .music_toggle = Rectangle {
             .x = 20.0,
