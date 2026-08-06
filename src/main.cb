@@ -230,6 +230,8 @@ type GameState struct {
     sounds_toggle: Rectangle,
     reset: bool = false,
     reset_button: Rectangle,
+    reset_button_delay: f32 = 2.0,
+    reset_button_count: f32 = 0.0,
 }
 
 type HexTile struct {
@@ -304,6 +306,25 @@ fn Board_new(screen_width: s32, screen_height: s32) Board {
     Board_spawn(&b);
 
     return b;
+}
+
+// Just for testing
+fn Board_fill_game_over(self: *Board) void {
+    let mut i: usize = 0;
+    while i < 19 {
+        let coord = index_to_axial(i, self.radius);
+        let diff = coord.q - coord.r;
+        let color = ((diff % 3) + 3) % 3;
+        let mut value: u32 = 1;
+        if color == 1 {
+            value = 2;
+        } else if color == 2 {
+            value = 4;
+        }
+        self.tiles[i].value = value;
+        self.tiles[i].exists = true;
+        i = i + 1;
+    }
 }
 
 fn Board_check_game_over(self: *Board, gs: *GameState) void {
@@ -758,7 +779,7 @@ fn draw_game_over_screen(gs: *GameState) void {
         let sub_x = gs.screen_width / 2 - sub_width / 2;
         let sub_y = gs.screen_height / 2 + 16;
         draw_text(&sub_text, sub_x, sub_y, sub_size, white);
-    } else {
+    } else if gs.reset_button_count > gs.reset_button_delay {
 
         let x: s32 = gs.reset_button.x as s32;
         let y: s32 = gs.reset_button.y as s32;
@@ -1014,6 +1035,9 @@ pub fn main() void {
         },
     };
 
+    // Board_fill_game_over(&gs.board);
+    // Board_check_game_over(&gs.board, &gs);
+
     let music = load_music_stream("./assets/music.mp3\0");
 
     play_music_stream(music);
@@ -1074,8 +1098,20 @@ pub fn main() void {
             gs.is_game_music_playing = !gs.is_game_music_playing;
         } else if is_mouse_button_pressed(MouseButton::left) and check_collision_point_rec(mouse_pos, gs.sounds_toggle) {
             gs.is_game_sounds_playing = !gs.is_game_sounds_playing;
-        } else if is_mouse_button_pressed(MouseButton::left) and check_collision_point_rec(mouse_pos, gs.reset_button) {
+        } else if
+            gs.reset_button_count > gs.reset_button_delay and
+            gs.state == State::game_over and
+            is_mouse_button_pressed(MouseButton::left) and
+            check_collision_point_rec(mouse_pos, gs.reset_button)
+        {
             gs.reset = true;
+        }
+
+        if (
+            gs.reset_button_delay > gs.reset_button_count and
+            gs.state == State::game_over
+        ) {
+            gs.reset_button_count = gs.reset_button_count + dt;
         }
 
         begin_drawing();
