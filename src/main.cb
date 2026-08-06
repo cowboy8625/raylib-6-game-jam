@@ -1084,6 +1084,7 @@ pub fn main() void {
             gs.state = State::running;
             gs.score = 0;
             gs.reset = false;
+            gs.reset_button_count = 0.0;
         }
 
         mouse_pos.x = get_mouse_x() as f32;
@@ -1101,7 +1102,7 @@ pub fn main() void {
         } else if
             gs.reset_button_count > gs.reset_button_delay and
             gs.state == State::game_over and
-            is_mouse_button_pressed(MouseButton::left) and
+            is_mouse_button_released(MouseButton::left) and
             check_collision_point_rec(mouse_pos, gs.reset_button)
         {
             gs.reset = true;
