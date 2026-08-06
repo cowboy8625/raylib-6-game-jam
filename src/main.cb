@@ -1053,6 +1053,9 @@ pub fn main() void {
         let dt = get_frame_time();
 
         update_music_stream(music);
+        if dt > 0.033 {
+            update_music_stream(music);
+        }
 
         if gs.state == State::running {
             let swipe_direction = get_swipe_direction(&swipe_state)
