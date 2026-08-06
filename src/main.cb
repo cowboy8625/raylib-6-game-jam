@@ -1032,8 +1032,9 @@ pub fn main() void {
 
         if gs.state == State::running {
             let swipe_direction = get_swipe_direction(&swipe_state)
-
-            if is_key_pressed(KeyboardKey::w) or swipe_direction == SwipeDirection::up {
+            if !(gs.board.anim_phase == AnimPhase::idle) {
+                // do nothing
+            } else if is_key_pressed(KeyboardKey::w) or swipe_direction == SwipeDirection::up {
                 Board_move(&gs.board, &gs, Direction::up);
             } else if is_key_pressed(KeyboardKey::s) or swipe_direction == SwipeDirection::down {
                 Board_move(&gs.board, &gs, Direction::down);
