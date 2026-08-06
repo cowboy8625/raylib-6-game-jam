@@ -990,7 +990,7 @@ pub fn main() void {
 
     init_window(screen_width, screen_height, &"c-flat raylib game jam entry attempt\0");
     init_audio_device();
-    set_audio_stream_buffer_size_default(4096 * 4);
+    set_audio_stream_buffer_size_default(4096);
     set_target_fps(60);
 
     let color_white = Color {.r=255, .g=255, .b=255, .a=255};
@@ -1038,7 +1038,7 @@ pub fn main() void {
     // Board_fill_game_over(&gs.board);
     // Board_check_game_over(&gs.board, &gs);
 
-    let music = load_music_stream("./assets/music.mp3\0");
+    let music = load_music_stream("./assets/output.mp3\0");
 
     play_music_stream(music);
     let mut swipe_state = SwipeState{};
@@ -1053,9 +1053,6 @@ pub fn main() void {
         let dt = get_frame_time();
 
         update_music_stream(music);
-        if dt > 0.033 {
-            update_music_stream(music);
-        }
 
         if gs.state == State::running {
             let swipe_direction = get_swipe_direction(&swipe_state)
