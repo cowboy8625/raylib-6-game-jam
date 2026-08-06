@@ -990,7 +990,7 @@ pub fn main() void {
 
     init_window(screen_width, screen_height, &"c-flat raylib game jam entry attempt\0");
     init_audio_device();
-    set_audio_stream_buffer_size_default(4096 * 2);
+    set_audio_stream_buffer_size_default(4096 * 4);
     set_target_fps(60);
 
     let color_white = Color {.r=255, .g=255, .b=255, .a=255};
