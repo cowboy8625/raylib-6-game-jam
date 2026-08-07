@@ -20,6 +20,8 @@ extern C fn write(*[u8], usize) void;
 extern C fn is_mobile() bool;
 extern C fn sqrtf(f32) f32;
 extern C fn atan2f(f32, f32) f32;
+extern C fn local_storage_save_item(*[u8], *[u8]) void;
+extern C fn local_storage_get_item(*[u8]) void;
 
 use std::raylib;
 use std::math;
@@ -1038,7 +1040,7 @@ pub fn main() void {
     // Board_fill_game_over(&gs.board);
     // Board_check_game_over(&gs.board, &gs);
 
-    let music = load_music_stream("./assets/output.ogg\0");
+    let music = load_music_stream("./assets/music.ogg\0");
 
     play_music_stream(music);
     let mut swipe_state = SwipeState{};

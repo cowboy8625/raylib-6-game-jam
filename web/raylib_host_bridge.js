@@ -410,6 +410,11 @@ export function makeRaylibHost(getCflatExports, canvas) {
 
     sqrtf: (x) => Math.fround(Math.sqrt(x)),
     atan2f: (y, x) => Math.fround(Math.atan2(y, x)),
+
+    // ----- js bindings ------
+
+    local_storage_save_item: (key, value) => localStorage.saveItem(key, value),
+    local_storage_get_item: (key) => localStorage.getItem(key),
   };
 
   return {
