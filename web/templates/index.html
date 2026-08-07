@@ -89,7 +89,8 @@
 
         const logEl = document.getElementById("log");
         const canvas = document.getElementById("canvas");
-        globalThis.__cflat_log = (s) => (logEl.textContent += s);
+        // globalThis.__cflat_log = (s) => (logEl.textContent += s);
+        globalThis.__cflat_log = console.log;
         const fail = (msg) => {
           logEl.innerHTML += `<span class="err">${msg}</span>\n`;
           console.error(msg);

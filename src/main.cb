@@ -15,13 +15,17 @@
 // ********************************************************************************************
 
 extern C fn write_s32(s32) void;
+extern C fn write_u8(u8) void;
 extern C fn write_char(u8) void;
 extern C fn write(*[u8], usize) void;
+extern C fn write_bool(bool) void;
+
 extern C fn is_mobile() bool;
 extern C fn sqrtf(f32) f32;
 extern C fn atan2f(f32, f32) f32;
-extern C fn local_storage_save_item(*[u8], *[u8]) void;
-extern C fn local_storage_get_item(*[u8]) void;
+extern C fn save_game_state(*[u8], usize) void;
+/// returns bytes read, -1 if none saved
+extern C fn load_game_state(*[u8], usize) s32;
 
 use std::raylib;
 use std::math;
@@ -310,7 +314,7 @@ fn Board_new(screen_width: s32, screen_height: s32) Board {
     return b;
 }
 
-// Just for testing
+/// Just for testing
 fn Board_fill_game_over(self: *Board) void {
     let mut i: usize = 0;
     while i < 19 {
@@ -327,6 +331,63 @@ fn Board_fill_game_over(self: *Board) void {
         self.tiles[i].exists = true;
         i = i + 1;
     }
+}
+
+type SaveBuffer struct {
+    bytes: [64; u8],
+}
+
+fn Board_serialize(self: *Board, gs: *GameState, out: *SaveBuffer) usize {
+    out.bytes[0] = 1; // version
+
+    let score = gs.score;
+    out.bytes[1] = (score % 256) as u8;
+    out.bytes[2] = ((score / 256) % 256) as u8;
+    out.bytes[3] = ((score / 65536) % 256) as u8;
+    out.bytes[4] = ((score / 16777216) % 256) as u8;
+
+    let mut i: usize = 0;
+    let mut off: usize = 5;
+    while i < 19 {
+        let tile = self.tiles[i];
+        out.bytes[off] = if tile.exists { 1 } else { 0 };
+        out.bytes[off + 1] = (tile.value % 256) as u8;
+        out.bytes[off + 2] = ((tile.value / 256) % 256) as u8;
+        i = i + 1;
+        off = off + 3;
+    }
+
+    return off;
+}
+
+fn Board_deserialize(self: *Board, gs: *GameState, data: *SaveBuffer, len: usize) bool {
+    if len < 62 or !(data.bytes[0] == 1) {
+        return false;
+    }
+
+    let score = (data.bytes[1] as u32)
+        + (data.bytes[2] as u32) * 256
+        + (data.bytes[3] as u32) * 65536
+        + (data.bytes[4] as u32) * 16777216;
+    gs.score = score;
+
+    let mut i: usize = 0;
+    let mut off: usize = 5;
+    while i < 19 {
+        let exists = data.bytes[off] == 1;
+        let value = (data.bytes[off + 1] as u32) + (data.bytes[off + 2] as u32) * 256;
+        self.tiles[i] = HexTile { .value = value, .exists = exists };
+        i = i + 1;
+        off = off + 3;
+    }
+
+    return true;
+}
+
+fn Board_save(self: *Board, gs: *GameState) void {
+    let mut buf = SaveBuffer { .bytes = [0; 64] };
+    let len = Board_serialize(self, gs, &buf);
+    save_game_state(&buf, len);
 }
 
 fn Board_check_game_over(self: *Board, gs: *GameState) void {
@@ -699,6 +760,7 @@ fn Board_update_anims(self: *Board, gs: *GameState, dt: f32) void {
             self.anim_count = 0;
             Board_check_game_over(self, gs);
             self.anim_phase = AnimPhase::idle;
+            Board_save(self, gs);
         }
     }
 }
@@ -1039,6 +1101,17 @@ pub fn main() void {
 
     // Board_fill_game_over(&gs.board);
     // Board_check_game_over(&gs.board, &gs);
+
+    let mut save_buf = SaveBuffer { .bytes = [0; 64] };
+    let bytes_read = load_game_state(&save_buf, 64);
+    if bytes_read > 0 {
+        let ok = Board_deserialize(&gs.board, &gs, &save_buf, bytes_read as usize);
+        if ok {
+            gs.state = State::running;
+            gs.board.anim_phase = AnimPhase::idle;
+            gs.board.anim_count = 0;
+        }
+    }
 
     let music = load_music_stream("./assets/music.ogg\0");
 

@@ -413,8 +413,36 @@ export function makeRaylibHost(getCflatExports, canvas) {
 
     // ----- js bindings ------
 
-    local_storage_save_item: (key, value) => localStorage.saveItem(key, value),
-    local_storage_get_item: (key) => localStorage.getItem(key),
+    save_game_state: (ptr, len) => {
+      const bytes = cfU8().subarray(ptr, ptr + len);
+      let bin = "";
+      for (let i = 0; i < bytes.length; i++)
+        bin += String.fromCharCode(bytes[i]);
+      try {
+        localStorage.setItem("cflat_game_state", btoa(bin));
+      } catch (e) {
+        // storage full or unavailable (e.g. private browsing) - fail silently
+      }
+    },
+    load_game_state: (ptr, maxLen) => {
+      let b64;
+      try {
+        b64 = localStorage.getItem("cflat_game_state");
+      } catch (e) {
+        return -1;
+      }
+      if (!b64) return -1;
+      let bin;
+      try {
+        bin = atob(b64);
+      } catch (e) {
+        return -1; // corrupted data, don't crash the game
+      }
+      const len = Math.min(bin.length, maxLen);
+      const heap = cfU8();
+      for (let i = 0; i < len; i++) heap[ptr + i] = bin.charCodeAt(i);
+      return len;
+    },
   };
 
   return {
