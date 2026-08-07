@@ -421,7 +421,7 @@ export function makeRaylibHost(getCflatExports, canvas) {
       try {
         localStorage.setItem("cflat_game_state", btoa(bin));
       } catch (e) {
-        // storage full or unavailable (e.g. private browsing) - fail silently
+        console.error(e);
       }
     },
     load_game_state: (ptr, maxLen) => {
@@ -436,13 +436,20 @@ export function makeRaylibHost(getCflatExports, canvas) {
       try {
         bin = atob(b64);
       } catch (e) {
-        return -1; // corrupted data, don't crash the game
+        // corrupted data, don't crash the game
+        return -1;
       }
       const len = Math.min(bin.length, maxLen);
       const heap = cfU8();
       for (let i = 0; i < len; i++) heap[ptr + i] = bin.charCodeAt(i);
       return len;
     },
+    save_game_score: (value) => localStorage.setItem("cflat_game_score", value),
+    load_game_score: () => Number(localStorage.getItem("cflat_game_score")),
+    save_game_high_score: (value) =>
+      localStorage.setItem("cflat_game_high_score", value),
+    load_game_high_score: () =>
+      Number(localStorage.getItem("cflat_game_high_score")),
   };
 
   return {

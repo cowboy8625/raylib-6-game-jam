@@ -26,6 +26,10 @@ extern C fn atan2f(f32, f32) f32;
 extern C fn save_game_state(*[u8], usize) void;
 /// returns bytes read, -1 if none saved
 extern C fn load_game_state(*[u8], usize) s32;
+extern C fn save_game_score(u32) void;
+extern C fn load_game_score() u32;
+extern C fn save_game_high_score(u32) void;
+extern C fn load_game_high_score() u32;
 
 use std::raylib;
 use std::math;
@@ -441,6 +445,7 @@ fn Board_check_game_over(self: *Board, gs: *GameState) void {
         r = r + 1;
     }
 
+    
     gs.state = State::game_over;
 }
 
@@ -761,6 +766,11 @@ fn Board_update_anims(self: *Board, gs: *GameState, dt: f32) void {
             Board_check_game_over(self, gs);
             self.anim_phase = AnimPhase::idle;
             Board_save(self, gs);
+            save_game_score(gs.score);
+            let current_high_score = load_game_high_score();
+            if gs.score > current_high_score {
+                save_game_high_score(gs.score);
+            }
         }
     }
 }
@@ -1110,6 +1120,7 @@ pub fn main() void {
             gs.state = State::running;
             gs.board.anim_phase = AnimPhase::idle;
             gs.board.anim_count = 0;
+            gs.score = load_game_score();
         }
     }
 
