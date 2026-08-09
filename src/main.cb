@@ -32,6 +32,8 @@ extern C fn save_game_high_score(u32) void;
 extern C fn load_game_high_score() u32;
 extern C fn save_game_music_toggle_state(bool) void;
 extern C fn load_game_music_toggle_state() s32;
+extern C fn save_game_sounds_toggle_state(bool) void;
+extern C fn load_game_sounds_toggle_state() s32;
 
 use std::raylib;
 use std::math;
@@ -1121,6 +1123,11 @@ pub fn main() void {
         gs.is_game_music_playing = loaded_game_music_toggle_state == 1;
     }
 
+    let loaded_game_sounds_toggle_state = load_game_sounds_toggle_state()
+    if loaded_game_sounds_toggle_state > 0 - 1 {
+        gs.is_game_sounds_playing = loaded_game_sounds_toggle_state == 1;
+    }
+
     if bytes_read > 0 {
         let ok = Board_deserialize(&gs.board, &gs, &save_buf, bytes_read as usize);
         if ok {
@@ -1194,6 +1201,7 @@ pub fn main() void {
             save_game_music_toggle_state(gs.is_game_music_playing);
         } else if is_mouse_button_pressed(MouseButton::left) and check_collision_point_rec(mouse_pos, gs.sounds_toggle) {
             gs.is_game_sounds_playing = !gs.is_game_sounds_playing;
+            save_game_sounds_toggle_state(gs.is_game_sounds_playing);
         } else if
             gs.reset_button_count > gs.reset_button_delay and
             gs.state == State::game_over and
