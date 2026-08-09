@@ -237,6 +237,7 @@ type GameState struct {
     board: Board,
     merge_sounds: [5; Sound],
     score: u32 = 0,
+    high_score: u32 = 0,
     state: State = State::running,
     is_game_music_playing: bool = true,
     music_toggle: Rectangle,
@@ -774,6 +775,7 @@ fn Board_update_anims(self: *Board, gs: *GameState, dt: f32) void {
             let current_high_score = load_game_high_score();
             if gs.score > current_high_score {
                 save_game_high_score(gs.score);
+                gs.high_score = gs.score;
             }
         }
     }
@@ -890,7 +892,23 @@ fn draw_score(score: s32) void {
     let text_score: [11; u8] = [0;11];
     number_to_c_string(score, &text_score);
 
-    draw_text(&text_score, 10, 10, 40, color_black);
+    let x: s32 = 10;
+
+    draw_text(&"Score\0", x, 10, 20, color_black);
+    draw_text(&text_score, x, 30, 40, color_black);
+}
+
+fn draw_high_score(score: s32, screen_width: s32) void {
+    let color_black = Color {.r=255, .g=255, .b=255, .a=255};
+
+    let text_score: [11; u8] = [0;11];
+    number_to_c_string(score, &text_score);
+    let text_width = measure_text(&text_score, 40);
+
+    let x: s32 = screen_width - text_width - 10;
+
+    draw_text(&"Best\0", screen_width - 60, 10, 20, color_black);
+    draw_text(&text_score, x, 30, 40, color_black);
 }
 
 type SwipeDirection enum {
@@ -1114,7 +1132,6 @@ pub fn main() void {
     };
 
     // Board_fill_game_over(&gs.board);
-    // Board_check_game_over(&gs.board, &gs);
 
     let mut save_buf = SaveBuffer { .bytes = [0; 64] };
     let bytes_read = load_game_state(&save_buf, 64);
@@ -1127,6 +1144,8 @@ pub fn main() void {
     if loaded_game_sounds_toggle_state > 0 - 1 {
         gs.is_game_sounds_playing = loaded_game_sounds_toggle_state == 1;
     }
+
+    gs.high_score = load_game_high_score();
 
     if bytes_read > 0 {
         let ok = Board_deserialize(&gs.board, &gs, &save_buf, bytes_read as usize);
@@ -1148,6 +1167,9 @@ pub fn main() void {
         .x = get_mouse_x() as f32,
         .y = get_mouse_y() as f32,
     };
+
+    // Check just in case player leaves on a game over board
+    Board_check_game_over(&gs.board, &gs);
 
     while !window_should_close() {
         // UPDATE
@@ -1224,6 +1246,7 @@ pub fn main() void {
         // DARW
 
         draw_score(gs.score as s32);
+        draw_high_score(gs.high_score as s32, screen_width);
 
         Board_draw_outline(&gs.board);
         Board_draw_grid(&gs.board);
