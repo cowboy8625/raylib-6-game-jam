@@ -450,6 +450,22 @@ export function makeRaylibHost(getCflatExports, canvas) {
       localStorage.setItem("cflat_game_high_score", value),
     load_game_high_score: () =>
       Number(localStorage.getItem("cflat_game_high_score")),
+    save_game_music_toggle_state: (value) =>
+      localStorage.setItem("cflat_game_music_toggle_state", Boolean(value)),
+    load_game_music_toggle_state: () => {
+      let value = localStorage.getItem("cflat_game_music_toggle_state");
+      if (["undefined", "null", null].includes(value)) return -1;
+      if (value === "true") return 1;
+      return 0;
+    },
+    save_game_sounds_toggle_state: (value) =>
+      localStorage.setItem("cflat_game_sounds_toggle_state", Boolean(value)),
+    load_game_sounds_toggle_state: () => {
+      let value = localStorage.getItem("cflat_game_sounds_toggle_state");
+      if (["undefined", "null", null].includes(value)) return -1;
+      if (value === "true") return 1;
+      return 0;
+    },
   };
 
   return {
